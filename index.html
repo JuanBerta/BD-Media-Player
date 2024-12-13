@@ -1,0 +1,470 @@
+<!DOCTYPE html>
+<html>
+
+    <head>
+        <title>Reproductor de Video Avanzado</title>
+        <style>
+            html,
+            body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                /* Aplicar padding y border al cálculo del ancho/alto */
+                background-color: #000;
+                overflow: hidden;
+                transition: background-color 0.3s ease, border 0.3s ease;
+            }
+
+            body.drag-over {
+                background-color: rgba(0, 123, 255, 0.2);
+                border: 3px dashed #007bff;
+            }
+
+            .contenedor-video {
+                position: relative;
+                /* Para permitir el posicionamiento absoluto de otros elementos */
+                height: 90%;
+                /* Ocupa el 90% de la altura disponible */
+            }
+
+            #video {
+                position: absolute;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+            }
+
+            .controles {
+                position: fixed;
+                bottom: 10px;
+                left: 0;
+                right: 0;
+                z-index: 999;
+                background-color: rgba(0, 0, 0, 0.7);
+                padding: 10px;
+                display: flex;
+                justify-content: space-between;
+            }
+
+            .controles button,
+            .controles input[type="range"],
+            .controles select {
+                background-color: rgba(85, 85, 85, 0.7);
+                color: white;
+                border: none;
+                padding: 8px 12px;
+                cursor: pointer;
+                margin: 0 5px;
+                border-radius: 5px;
+                transition: background-color 0.3s ease;
+            }
+
+            .controles button:hover,
+            .controles input[type="range"]:hover,
+            .controles select:hover {
+                background-color: rgba(100, 100, 100, 0.9);
+            }
+
+            .controles input[type="range"] {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 150px;
+                height: 8px;
+                background: rgba(221, 221, 221, 0.5);
+                outline: none;
+                border-radius: 5px;
+                margin: 0 10px;
+            }
+
+            .controles input[type="range"]::-moz-range-track {
+                width: 100%;
+                height: 8px;
+                background: rgba(221, 221, 221, 0.5);
+                border: none;
+                border-radius: 5px;
+            }
+
+            .controles input[type="range"]::-moz-range-thumb {
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #04AA6D;
+                cursor: pointer;
+                border: none;
+            }
+
+            .controles input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #04AA6D;
+                cursor: pointer;
+                border: none;
+            }
+
+            .controles #barraProgreso {
+                flex-grow: 1;
+                background-color: rgba(221, 221, 221, 0.5);
+                cursor: pointer;
+                border-radius: 5px;
+                margin: 0 10px;
+            }
+
+            .controles #indicadorProgreso {
+                position: absolute;
+                top: -3px;
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                background-color: #04AA6D;
+                cursor: pointer;
+                pointer-events: none;
+            }
+
+            #controlVolumen {
+                width: 40px;
+                height: 30px;
+                margin: 0 10px;
+            }
+
+            #btnSilencio {
+                border: none;
+                padding: 0;
+            }
+
+            #btnSilencio.activo {
+                background-color: #007bff;
+                /* Azul */
+            }
+
+            #btnLoop {
+                padding: 0;
+                margin: 0 10px;
+            }
+
+            #btnLoop.activo {
+                background-color: #007bff;
+                /* Azul */
+            }
+
+            #audioIcon,
+            #loopIcon {
+                display: block;
+                width: 20px;
+                height: 25px;
+            }
+
+            #tiempo {
+                color: white;
+            }
+        </style>
+    </head>
+
+    <body draggable="false">
+        <div class="contenedor-video">
+            <video id="video"></video>
+            <audio id="audio"></audio>
+            <div class="controles">
+                <button id="btnReproducir">Reproducir</button>
+                <input type="file" id="fileInput" style="display: none;">
+                <button id="btnSeleccionarArchivos">Seleccionar Archivo</button>
+                <button id="btnSilencio">
+                    <img id="audioIcon" src="images\audio_icon.png" alt="Audio Icon">
+                </button>
+                <input type="range" id="controlVolumen" min="0" max="1" step="0.1" value="1">
+                <div id="barraProgreso"></div>
+                <button id="btnPantallaCompleta">Pantalla Completa</button>
+                <select id="selectorVelocidad">
+                    <option value="0.5">0.5x</option>
+                    <option value="1" selected>1x</option>
+                    <option value="1.5">1.5x</option>
+                    <option value="2">2x</option>
+                </select>
+                <button id="btnLoop">
+                    <img id="loopIcon" src="images\loop_icon.png" alt="Loop Icon">
+                    <div id="activo"></div>
+                </button>
+                <span id="tiempo">0:00 / 0:00</span>
+            </div>
+        </div>
+
+        <script>
+            const video = document.getElementById('video');
+            const audio = document.getElementById('audio');
+            const btnReproducir = document.getElementById('btnReproducir');
+            const btnSilencio = document.getElementById('btnSilencio');
+            const fileInput = document.getElementById('fileInput');
+            const btnSeleccionarArchivos = document.getElementById('btnSeleccionarArchivos');
+            const controlVolumen = document.getElementById('controlVolumen');
+            const barraProgreso = document.getElementById('barraProgreso');
+            const btnPantallaCompleta = document.getElementById('btnPantallaCompleta');
+            const selectorVelocidad = document.getElementById('selectorVelocidad');
+            const tiempo = document.getElementById('tiempo');
+            const btnLoop = document.getElementById('btnLoop');
+
+            var tipoArchivo
+            var volumenAntiguo
+            var mediaActivo
+
+            btnSeleccionarArchivos.addEventListener('click', () => {
+                fileInput.click();
+            });
+
+            // Función para manejar la carga y reproducción de archivos
+            const cargarArchivo = (file) => {
+                var url = URL.createObjectURL(file);
+
+                tipoArchivo = esVideoOAudio(file); // Usar la función de comprobación
+
+                console.log(esVideoOAudio(file));
+
+                if (tipoArchivo === 'video') {
+                    video.src = url;
+                    video.load();
+                    video.addEventListener('loadedmetadata', handleVideoLoaded);
+                } else if (tipoArchivo === 'audio') {
+                    audio.src = url;
+                    audio.load();
+                    audio.addEventListener('loadedmetadata', handleAudioLoaded);
+                }
+            };
+
+            function esVideoOAudio(file) {
+                if (!file.type) {
+                    const extension = file.name.split('.').pop().toLowerCase();
+                    if (['mp4', 'webm', 'ogg', 'mov'].includes(extension)) return 'video';
+                    if (['mp3', 'wav', 'ogg'].includes(extension)) return 'audio';
+                    return null;
+                }
+
+                if (file.type.startsWith('video/')) {
+                    return 'video';
+                } else if (file.type.startsWith('audio/')) {
+                    return 'audio';
+                } else {
+                    return null;
+                }
+            }
+
+            const handleVideoLoaded = () => {
+                video.play();
+                btnReproducir.textContent = 'Pausar';
+                video.removeEventListener('loadedmetadata', handleVideoLoaded);
+            };
+
+            const handleAudioLoaded = () => {
+                audio.play();
+                btnReproducir.textContent = 'Pausar';
+                audio.removeEventListener('loadedmetadata', handleAudioLoaded);
+            };
+            let playOnLoad;       // Declarar playOnLoad fuera
+
+            fileInput.addEventListener('change', (event) => {
+                const file = event.target.files[0];
+                if (!file) return;
+
+                const url = URL.createObjectURL(file);
+                const tipoArchivo = file.type.split('/')[0];
+
+                // 1. Determinar el NUEVO medio (antes de limpiar el anterior)
+                let nuevoMedia;
+                if (tipoArchivo === 'video') {
+                    nuevoMedia = video;
+                } else if (tipoArchivo === 'audio') {
+                    nuevoMedia = audio;
+                } else {
+                    console.error("Tipo de archivo no compatible.");
+                    URL.revokeObjectURL(url);
+                    return;
+                }
+
+                // 2. Limpiar el medio ACTIVO anterior (si existe)
+                if (mediaActivo) {
+                    mediaActivo.pause();
+                    URL.revokeObjectURL(mediaActivo.src);
+                    mediaActivo.src = '';
+                    mediaActivo.removeEventListener('loadedmetadata', playOnLoad); // Usar playOnLoad declarada globalmente
+                    mediaActivo.removeEventListener('timeupdate', actualizarTiempo);
+                }
+
+                // 3. Asignar el NUEVO medio como ACTIVO (DESPUÉS de limpiar el anterior)
+                mediaActivo = nuevoMedia;
+
+                // 4. Asignar la nueva fuente
+                mediaActivo.src = url;
+
+                //Reasignamos playOnLoad ANTES de adjuntar el listener para guardar la nueva referencia.
+                playOnLoad = () => {
+                    mediaActivo.play();
+                    btnReproducir.textContent = 'Pausar';
+                    mediaActivo.removeEventListener('loadedmetadata', playOnLoad);
+                };
+
+
+                mediaActivo.addEventListener('loadedmetadata', playOnLoad);
+                mediaActivo.addEventListener('timeupdate', actualizarTiempo);
+            });
+
+            document.addEventListener('dragover', (event) => {
+                event.preventDefault();
+                document.body.classList.add('drag-over'); // Añade la clase drag-over
+            });
+
+            document.addEventListener('dragleave', (event) => { //Nuevo evento
+                document.body.classList.remove('drag-over'); // Quita la clase drag-over
+            });
+
+            document.addEventListener('dragenter', (event) => {
+                event.preventDefault();
+            });
+
+            document.addEventListener('drop', (event) => {
+                event.preventDefault();
+                document.body.classList.remove('drag-over');
+                const file = event.dataTransfer.files[0];
+                if (!file) return;
+
+                const url = URL.createObjectURL(file);
+                tipoArchivo = file.type.split('/')[0];
+
+                if (tipoArchivo === 'video') {
+                    video.src = url;
+                    video.load();
+                    // Agregar el evento timeupdate aquí
+                    video.addEventListener('timeupdate', actualizarTiempo);
+                    video.addEventListener("loadedmetadata", actualizarTiempo);
+                } else if (tipoArchivo === 'audio') {
+                    audio.src = url;
+                    audio.load();
+                    // Agregar el evento timeupdate aquí
+                    audio.addEventListener('timeupdate', actualizarTiempo);
+                    audio.addEventListener("loadedmetadata", actualizarTiempo);
+                }
+            });
+
+            video.addEventListener('loadedmetadata', () => {
+                // Una vez que el video ha cargado los metadatos
+                btnReproducir.textContent = 'Reproducir';
+            });
+
+            audio.addEventListener('loadedmetadata', () => {
+                // Una vez que el audio ha cargado los metadatos
+                btnReproducir.textContent = 'Reproducir';
+            });
+
+            btnReproducir.addEventListener('click', () => {
+                if (video.src) {
+                    if (video.paused || video.currentTime === 0) { // Reproducir si está pausado o al principio
+                        video.play();
+                        btnReproducir.textContent = 'Pausar';
+                    } else {
+                        video.pause();
+                        btnReproducir.textContent = 'Reproducir';
+                    }
+                } else if (audio.src) {
+                    if (audio.paused || audio.currentTime === 0) { // Reproducir si está pausado o al principio
+                        audio.play();
+                        btnReproducir.textContent = 'Pausar';
+                    } else {
+                        audio.pause();
+                        btnReproducir.textContent = 'Reproducir';
+                    }
+                }
+            });
+
+            btnSilencio.addEventListener('click', function () {
+
+                if (!mediaActivo.muted) { // Si NO está muteado (lo vamos a mutear)
+                    //Guardamos el valor solo si se va a mutear
+                    mediaActivo.volumenAntiguo = controlVolumen.value;
+                    mediaActivo.muted = true;
+                    controlVolumen.value = 0;
+                    btnSilencio.classList.toggle('activo');
+                } else { // Si ESTÁ muteado (lo vamos a desmutear)
+                    mediaActivo.muted = false;
+                    controlVolumen.value = mediaActivo.volumenAntiguo;
+                    btnSilencio.classList.toggle('activo');
+                }
+            });
+
+            //Ejemplo de inicializacion del controlVolumen:
+            controlVolumen.addEventListener("input", () => {
+                mediaActivo.volume = controlVolumen.value;
+            });
+
+            barraProgreso.addEventListener('click', function (e) {
+                let rect = barraProgreso.getBoundingClientRect();
+                let posicion = (e.clientX - rect.left) / rect.width;
+                mediaActivo.currentTime = posicion * mediaActivo.duration;
+            });
+
+            function actualizarTiempo() {
+                if (isNaN(mediaActivo.duration)) return; //Para evitar errores al iniciar
+                let minutos = Math.floor(mediaActivo.currentTime / 60);
+                let segundos = Math.floor(mediaActivo.currentTime % 60);
+                let duracionMinutos = Math.floor(mediaActivo.duration / 60);
+                let duracionSegundos = Math.floor(mediaActivo.duration % 60);
+                let progreso = (mediaActivo.currentTime / mediaActivo.duration) * 100;
+
+                barraProgreso.style.background = `linear-gradient(to right, #04AA6D ${progreso}%, rgba(221, 221, 221, 0.5) ${progreso}%)`;
+                barraProgreso.style.left = `calc(${progreso}% - 7px)`; // Posiciona el círculo. 7px es la mitad del ancho.
+                if (segundos < 10) {
+                    segundos = "0" + segundos;
+                }
+                if (duracionSegundos < 10) {
+                    duracionSegundos = "0" + duracionSegundos;
+                }
+                tiempo.textContent = minutos + ":" + segundos + " / " + duracionMinutos + ":" + duracionSegundos;
+
+            }
+
+            btnPantallaCompleta.addEventListener('click', function () {
+                if (mediaActivo) {
+                    mediaActivo.requestFullscreen() ||
+                        mediaActivo.mozRequestFullScreen() ||
+                        mediaActivo.webkitRequestFullscreen() ||
+                        mediaActivo.msRequestFullscreen();
+                }
+            });
+
+            selectorVelocidad.addEventListener('change', function () {
+                mediaActivo.playbackRate = selectorVelocidad.value;
+            });
+
+            // Suponiendo que mediaActivo es un elemento de video
+            let bucle = false;
+
+            btnLoop.addEventListener('click', () => {
+                bucle = !bucle;
+                btnLoop.classList.toggle('activo'); // Asegúrate de que 'activo' cambie el fondo
+                console.log('Botón presionado, bucle:', bucle); // Verifica si el evento se dispara
+            });
+
+            video.addEventListener('ended', () => {
+                if (bucle) {
+                    console.log('Video finalizado, reiniciando...');
+                    video.currentTime = 0;
+                    video.play();
+                } else {
+                    console.log('Video finalizado, bucle desactivado');
+                }
+            });
+
+            audio.addEventListener('ended', () => {
+                if (bucle) {
+                    console.log('Video finalizado, reiniciando...');
+                    audio.currentTime = 0;
+                    audio.play();
+                } else {
+                    console.log('Video finalizado, bucle desactivado');
+                }
+            });
+        </script>
+    </body>
+
+</html>
