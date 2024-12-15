@@ -22,10 +22,10 @@ This project is a simple multplatform web media player that allows you to play v
 
 ## How to Use
 
-1.  Clone this repository (optional, if it's in a repository):
+1.  Clone this repository:
 
     ```bash
-    git clone [your-username/your-repository]
+    git clone https://github.com/JuanBerta/BD-Media-Player.git
     ```
 
 2.  Open the `index.html` file in your browser.
@@ -51,7 +51,10 @@ This project is a simple multplatform web media player that allows you to play v
 
 ## Screenshots (Optional)
 
-(Add screenshots of the player in action)
+![Screenshot 1](https://github.com/JuanBerta/BD-Media-Player/blob/main/Screenshots/Captura%20de%20pantalla%202024-12-15%20155808.png)
+![Playing a video](https://github.com/JuanBerta/BD-Media-Player/blob/main/Screenshots/Captura%20de%20pantalla%202024-12-15%20155828.png)
+(Reproduced Video is property of this Youtube Channel: https://www.youtube.com/watch?v=Sf7mxUCFuXg&list=RDGMEMXdNDEg4wQ96My0DhjI-cIg&index=22)
+
 
 ## Contributions
 
@@ -59,4 +62,4 @@ Contributions are welcome. If you find any bugs or have any suggestions for impr
 
 ## License
 
-(Add the license under which your project is distributed, e.g., MIT License)
+MIT License
