@@ -4,13 +4,32 @@
   "main": "main.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "electron ."
+    "start": "electron .",
+    "build": "electron-builder"
   },
   "keywords": [],
-  "author": "",
+  "author": "Beinded",
   "license": "ISC",
   "description": "",
   "devDependencies": {
-    "electron": "^33.2.1"
+    "@lingui/babel-plugin-lingui-macro": "^5.0.0",
+    "electron": "^33.2.1",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.yourcompany.beindedmediareproducer",
+    "productName": "Beinded Media Reproducer",
+    "directories": {
+      "output": "dist"
+    },
+    "win": {
+      "icon": "images/BDMediaPlayerIcon.png"
+    },
+    "mac": {
+      "icon": "images/BDMediaPlayerIcon.icns"
+    },
+    "linux": {
+      "icon": "images/BDMediaPlayerIcon.png"
+    }
   }
 }
