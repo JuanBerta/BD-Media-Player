@@ -1,0 +1,186 @@
+html,
+            body {
+                width: 100%;
+                height: 100%;
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+                /* Aplicar padding y border al cálculo del ancho/alto */
+                background-color: #181818; /* Dark gray for body */
+                overflow: hidden;
+                transition: background-color 0.3s ease, border 0.3s ease;
+            }
+
+            body.drag-over {
+                background-color: rgba(0, 123, 255, 0.2);
+                border: 3px dashed #007bff;
+            }
+
+            .contenedor-video {
+                width: 100%;
+                /* Ocupa todo el ancho disponible */
+                height: 90%;
+                /* Permite que la altura se ajuste automáticamente */
+            }
+
+            #video {
+                width: 100%;
+                /* Ocupa todo el ancho del contenedor */
+                height: 100%;
+                /* Ocupa toda la altura del contenedor */
+            }
+
+            .controles {
+                position: fixed;
+                bottom: 10px;
+                left: 0;
+                right: 0;
+                z-index: 999;
+                background-color: #282828; /* Slightly lighter dark gray for controls */
+                padding: 5px 10px; /* Slimmer control bar */
+                display: flex;
+                justify-content: space-between;
+                align-items: center; /* Vertically align items */
+            }
+
+            .controles button,
+            .controles input[type="range"],
+            .controles select {
+                background-color: #383838; /* Medium gray for controls */
+                color: #FFFFFF; /* White text */
+                border: none;
+                padding: 5px 8px; /* Smaller buttons and controls */
+                cursor: pointer;
+                margin: 0 3px; /* Consistent gap */
+                border-radius: 5px;
+                transition: background-color 0.3s ease;
+            }
+
+            .controles button:hover,
+            .controles input[type="range"]:hover,
+            .controles select:hover {
+                background-color: #585858; /* Slightly lighter gray for hover distinction */
+            }
+
+            .controles input[type="range"] {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 150px;
+                height: 8px;
+                background: #505050; /* Light gray for track */
+                outline: none;
+                border-radius: 5px;
+                margin: 0 3px; /* Consistent gap, same as other controls */
+            }
+
+            .controles input[type="range"]::-moz-range-track {
+                width: 100%;
+                height: 8px;
+                background: #505050; /* Light gray for track */
+                border: none;
+                border-radius: 5px;
+            }
+
+            .controles input[type="range"]::-moz-range-thumb {
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #FF0000; /* YouTube red for thumb */
+                cursor: pointer;
+                border: none;
+            }
+
+            .controles input[type="range"]::-webkit-slider-thumb {
+                -webkit-appearance: none;
+                appearance: none;
+                width: 16px;
+                height: 16px;
+                border-radius: 50%;
+                background: #FF0000; /* YouTube red for thumb */
+                cursor: pointer;
+                border: none;
+            }
+
+            .controles #barraProgreso {
+                flex-grow: 1;
+                background-color: #505050; /* Light gray for progress bar background */
+                cursor: pointer;
+                border-radius: 5px;
+                margin: 0 8px; /* Adjusted margin for better spacing */
+            }
+
+            .controles #indicadorProgreso {
+                position: absolute;
+                top: -3px;
+                width: 14px;
+                height: 14px;
+                border-radius: 50%;
+                background-color: #FF0000; /* YouTube red for progress indicator thumb */
+                cursor: pointer;
+                pointer-events: none;
+            }
+
+            #controlVolumen {
+                width: 40px; /* Keep specific width for this small slider */
+                height: 30px;
+                margin: 0 3px 0 8px; /* Group with mute, add left margin for separation */
+            }
+
+            #btnSilencio {
+                border: none;
+                padding: 5px 8px; /* Match other buttons */
+                margin: 0 3px;
+            }
+
+            /* #btnSilencio.activo removed to use general .activo styling */
+
+            #btnSeleccionarArchivos {
+                margin-left: 8px; /* Add space after play button */
+            }
+
+            #idiomaSelector {
+                 margin-left: 8px; /* Add space before progress bar group */
+            }
+
+            #btnPantallaCompleta {
+                margin-left: 8px; /* Add space after progress bar group */
+            }
+
+            #selectorVelocidad {
+                margin-left: 3px; /* Standard gap */
+            }
+
+            #btnLoop {
+                padding: 5px 8px; /* Match other buttons */
+                margin: 0 3px;
+            }
+
+            /* #btnLoop.activo removed to use general .activo styling */
+
+            #audioIcon,
+            #loopIcon {
+                display: block;
+                width: 20px;
+                height: 20px; /* Adjusted for new padding */
+            }
+
+            .controles button svg {
+                width: 20px; /* Or desired size */
+                height: 20px; /* Or desired size */
+                fill: #FFFFFF; /* Default white color */
+                display: block; /* Helps with alignment */
+                margin: auto; /* Center if button padding is larger */
+            }
+
+            .controles button.activo {
+                background-color: #484848; /* Slightly different shade for active button background */
+            }
+            /* Specific styling for active/toggled states if needed, using parent class */
+            .controles button.activo svg {
+                fill: #FF0000; /* YouTube red for active loop/mute */
+            }
+
+            #tiempo {
+                color: white;
+                margin: 0 8px; /* Space around time display */
+            }

@@ -11,6 +11,15 @@ const selectorVelocidad = document.getElementById('selectorVelocidad');
 const tiempo = document.getElementById('tiempo');
 const btnLoop = document.getElementById('btnLoop');
 
+// SVG Icons
+const playIconSVG = '<svg viewBox="0 0 36 36" fill="currentColor"><path d="M 12,26 18.5,22 18.5,14 12,10 z M 18.5,22 25,18 25,18 18.5,14 z"></path></svg>';
+const pauseIconSVG = '<svg viewBox="0 0 36 36" fill="currentColor"><path d="M 12,26 16,26 16,10 12,10 z M 21,26 25,26 25,10 21,10 z"></path></svg>';
+const volumeHighIconSVG = '<svg viewBox="0 0 36 36" fill="currentColor"><path d="M8,21 L12,21 L17,26 L17,10 L12,15 L8,15 L8,21 Z M19,14 L19,22 C20.48,21.32 21.5,19.77 21.5,18 C21.5,16.23 20.48,14.68 19,14 ZM19,11.29 C21.89,12.15 24,14.83 24,18 C24,21.17 21.89,23.85 19,24.71 L19,26.77 C23.01,25.86 26,22.28 26,18 C26,13.72 23.01,10.14 19,9.23 L19,11.29 Z"></path></svg>';
+const volumeMutedIconSVG = '<svg viewBox="0 0 36 36" fill="currentColor"><path d="M8,21 L12,21 L17,26 L17,10 L12,15 L8,15 L8,21 Z M24.71,15.98L22.91,14.18L20.85,16.24L18.79,14.18L16.99,15.98L19.05,18.04L16.99,20.10L18.79,21.90L20.85,19.84L22.91,21.90L24.71,20.10L22.65,18.04L24.71,15.98Z"></path></svg>';
+const fullscreenEnterIconSVG = '<svg viewBox="0 0 36 36" fill="currentColor"><path d="m 10,16 2,0 0,-4 4,0 0,-2 L 10,10 l 0,6 0,0 z m 12,0 2,0 0,-6 -6,0 0,2 4,0 0,4 0,0 z m -12,8 2,0 0,4 -4,0 0,2 L 16,30 l 0,-6 -2,0 0,0 z m 16,0 0,6 -6,0 0,-2 4,0 0,-4 2,0 0,0 z"></path></svg>';
+const loopIconSVG = '<svg viewBox="0 0 36 36" fill="currentColor"><path d="M20.95,10.05 C17.7,7.6 13.05,8.25 10.35,11.4 L7.5,8.55 L7.5,15.75 L14.7,15.75 L11.7,12.75 C13.65,10.95 16.6,10.5 18.95,11.85 L20.5,9.75 C20.63,9.83 20.78,9.93 20.95,10.05 Z M28.5,20.25 L21.3,20.25 L24.3,23.25 C22.35,25.05 19.4,25.5 17.05,24.15 L15.5,26.25 C15.37,26.17 15.22,26.07 15.05,25.95 C18.3,28.4 22.95,27.75 25.65,24.6 L28.5,27.45 L28.5,20.25 Z"></path></svg>';
+
+
 var tipoArchivo
 var mediaActivo
 var nuevoMedia
@@ -56,7 +65,9 @@ fileInput.addEventListener('change', (event) => {
     //Reasignamos playOnLoad ANTES de adjuntar el listener para guardar la nueva referencia.
     playOnLoad = () => {
         mediaActivo.play();
-        btnReproducir.textContent = isPlaying ? translate('pausar') : translate('reproducir');
+        // isPlaying will be true here, so set pause icon
+        isPlaying = true; // Ensure isPlaying is set correctly before updating icon
+        updatePlayButtonIcon();
         mediaActivo.removeEventListener('loadedmetadata', playOnLoad);
     };
 
@@ -105,10 +116,12 @@ function toggleMute() {
         mediaActivo.muted = false;
         mediaActivo.volume = volumenAnterior;
         btnSilencio.classList.remove('activo');
+        btnSilencio.innerHTML = volumeHighIconSVG;
     } else {
         volumenAnterior = mediaActivo.volume;
         mediaActivo.muted = true;
         btnSilencio.classList.add('activo');
+        btnSilencio.innerHTML = volumeMutedIconSVG;
     }
 }
 
@@ -154,14 +167,19 @@ fileInput.addEventListener('change', (event) => {
 
 let isPlaying = false;
 
-function updatePlayButtonText() {
-    btnReproducir.textContent = isPlaying ? translate('pausar') : translate('reproducir');
+function updatePlayButtonIcon() {
+    // Make sure mediaActivo exists before trying to check its state
+    if (mediaActivo) {
+        isPlaying = !mediaActivo.paused && !mediaActivo.ended;
+    } else {
+        isPlaying = false; // Default to not playing if no media
+    }
+    btnReproducir.innerHTML = isPlaying ? pauseIconSVG : playIconSVG;
 }
 
 function handleMetadataLoaded(media) {
     mediaActivo = media;
-    isPlaying = !media.paused && !media.ended; // Usar el estado real del medio
-    updatePlayButtonText();
+    updatePlayButtonIcon(); // Update icon based on actual media state
 }
 
 video.addEventListener('loadedmetadata', () => handleMetadataLoaded(video));
@@ -175,32 +193,42 @@ btnReproducir.addEventListener('click', () => {
     } else {
         mediaActivo.play();
     }
-    isPlaying = !mediaActivo.paused && !mediaActivo.ended; //Actualiza el estado real en cada click
-    updatePlayButtonText();//Se actualiza el botón después de cada click.
+    // isPlaying state is determined by the actual media state after play/pause call
+    // No need to manually set isPlaying here, event listeners for 'play' and 'pause' will handle it.
+    // updatePlayButtonIcon will also be called by those event listeners.
 });
 
 video.addEventListener('play', () => {
     isPlaying = true;
-    updatePlayButtonText();
+    updatePlayButtonIcon();
 });
 
 video.addEventListener('pause', () => {
     isPlaying = false;
-    updatePlayButtonText();
+    updatePlayButtonIcon();
 });
 
 audio.addEventListener('play', () => {
     isPlaying = true;
-    updatePlayButtonText();
+    updatePlayButtonIcon();
 });
 
 audio.addEventListener('pause', () => {
     isPlaying = false;
-    updatePlayButtonText();
+    updatePlayButtonIcon();
 });
 
 window.addEventListener('languageChanged', () => {
-    if (mediaActivo) handleMetadataLoaded(mediaActivo);// Se llama a handleMetadataLoaded para actualizar el estado despues del cambio de idioma.
+    // Text for buttons like "Seleccionar Archivo" is handled by i18n library.
+    // Icons are language-independent, but play/pause state might need refresh
+    // if it was reliant on translated text which is now an icon.
+    // Calling updatePlayButtonIcon ensures the correct play/pause icon is shown.
+    if (mediaActivo) {
+        updatePlayButtonIcon();
+    } else {
+        // If no media is active, ensure play button shows 'play' icon
+        btnReproducir.innerHTML = playIconSVG;
+    }
 });
 
 //Ejemplo de inicializacion del controlVolumen:
@@ -222,7 +250,7 @@ function actualizarTiempo() {
     let duracionSegundos = Math.floor(mediaActivo.duration % 60);
     let progreso = (mediaActivo.currentTime / mediaActivo.duration) * 100;
 
-    barraProgreso.style.background = `linear-gradient(to right, #04AA6D ${progreso}%, rgba(221, 221, 221, 0.5) ${progreso}%)`;
+    barraProgreso.style.background = `linear-gradient(to right, #FF0000 ${progreso}%, rgba(221, 221, 221, 0.5) ${progreso}%)`; /* Updated to YouTube red */
     barraProgreso.style.left = `calc(${progreso}% - 7px)`; // Posiciona el círculo. 7px es la mitad del ancho.
     if (segundos < 10) {
         segundos = "0" + segundos;
@@ -252,9 +280,28 @@ let bucle = false;
 
 btnLoop.addEventListener('click', () => {
     bucle = !bucle;
-    btnLoop.classList.toggle('activo'); // Asegúrate de que 'activo' cambie el fondo
-    console.log('Botón presionado, bucle:', bucle); // Verifica si el evento se dispara
+    btnLoop.classList.toggle('activo'); // CSS will handle the visual change for active state
+    // Icon itself doesn't change, just its color via CSS .activo svg
+    console.log('Botón presionado, bucle:', bucle);
 });
+
+function initializeIcons() {
+    btnReproducir.innerHTML = playIconSVG;
+    // Set initial volume icon based on current muted state (if mediaActivo exists) or default to high
+    if (mediaActivo && mediaActivo.muted) {
+        btnSilencio.innerHTML = volumeMutedIconSVG;
+        btnSilencio.classList.add('activo');
+    } else {
+        btnSilencio.innerHTML = volumeHighIconSVG;
+        btnSilencio.classList.remove('activo');
+    }
+    btnLoop.innerHTML = loopIconSVG; // Loop icon is static, active state by class
+    btnPantallaCompleta.innerHTML = fullscreenEnterIconSVG;
+}
+
+// Call initialization
+initializeIcons();
+
 
 video.addEventListener('ended', () => {
     if (bucle) {
