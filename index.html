@@ -11,25 +11,33 @@
             <video id="video"></video>
             <audio id="audio"></audio>
             <div class="controles">
-                <button id="btnReproducir"></button>
+                <button id="btnReproducir" title="Play (k)"></button>
                 <input type="file" id="fileInput" style="display: none;">
-                <button id="btnSeleccionarArchivos">Seleccionar Archivo</button>
-                <button id="btnSilencio"></button>
-                <input type="range" id="controlVolumen" min="0" max="1" step="0.1" value="1">
+                <button id="btnSeleccionarArchivos" title="Open file (o)">Seleccionar Archivo</button>
+                <div id="volumeControlContainer">
+                    <input type="range" id="controlVolumen" min="0" max="1" step="0.1" value="1">
+                    <button id="btnSilencio" title="Mute (m)"></button>
+                </div>
                 <select id="idiomaSelector">
                     <option value="es" id="esOption">Español</option>
                     <option value="en" id="enOption">Inglés</option>
                 </select>
                 <div id="barraProgreso"></div>
-                <button id="btnPantallaCompleta"></button>
-                <select id="selectorVelocidad">
-                    <option value="0.5">0.5x</option>
-                    <option value="1" selected>1x</option>
-                    <option value="1.5">1.5x</option>
-                    <option value="2">2x</option>
-                </select>
-                <button id="btnLoop"></button>
+                <button id="btnMiniplayer" title="Miniplayer (i)"></button>
+                <button id="btnPantallaCompleta" title="Fullscreen (f)"></button>
+                <button id="btnSettings" title="Settings (s)"></button>
+                <button id="btnLoop" title="Loop (l)"></button>
                 <span id="tiempo">0:00 / 0:00</span>
+            </div>
+        </div>
+
+        <div id="settingsMenu" class="settings-menu-popup" style="display: none;">
+            <div class="settings-menu-header">Playback speed</div>
+            <div id="playbackSpeedOptions">
+                <div class="settings-option" data-value="0.5">0.5x</div>
+                <div class="settings-option active" data-value="1">Normal</div>
+                <div class="settings-option" data-value="1.5">1.5x</div>
+                <div class="settings-option" data-value="2">2x</div>
             </div>
         </div>
 

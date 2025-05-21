@@ -120,16 +120,29 @@ html,
                 pointer-events: none;
             }
 
+            #volumeControlContainer {
+                position: relative;
+                display: flex;
+                align-items: center;
+                margin: 0 3px; /* Maintain overall spacing in the control bar */
+            }
+
             #controlVolumen {
-                width: 40px; /* Keep specific width for this small slider */
-                height: 30px;
-                margin: 0 3px 0 8px; /* Group with mute, add left margin for separation */
+                display: none; /* Hidden by default */
+                width: 80px; /* Slightly wider for better usability if horizontal */
+                height: 8px; /* Match other slider styles if needed, or keep specific if it's okay */
+                margin-right: 5px; /* Space between slider (left) and mute button (right) */
+                /* Existing styles for -webkit-appearance, appearance, background, outline, border-radius are still applied from generic .controles input[type="range"] */
+            }
+
+            #volumeControlContainer:hover #controlVolumen {
+                display: inline-block;
             }
 
             #btnSilencio {
                 border: none;
                 padding: 5px 8px; /* Match other buttons */
-                margin: 0 3px;
+                /* margin is removed as it's now controlled by #volumeControlContainer or flex properties */
             }
 
             /* #btnSilencio.activo removed to use general .activo styling */
@@ -139,7 +152,7 @@ html,
             }
 
             #idiomaSelector {
-                 margin-left: 8px; /* Add space before progress bar group */
+                 margin-left: 8px; /* Add space after volume control group */
             }
 
             #btnPantallaCompleta {
@@ -183,4 +196,42 @@ html,
             #tiempo {
                 color: white;
                 margin: 0 8px; /* Space around time display */
+            }
+
+            #btnSettings {
+                /* Inherits general button styling from .controles button */
+                /* Specific padding/margin if needed, but should be fine with default */
+            }
+
+            .settings-menu-popup {
+                position: absolute;
+                bottom: 50px; /* Adjust as needed based on control bar height */
+                right: 10px; /* Adjust to align near settings button */
+                background-color: #282828;
+                border: 1px solid #383838;
+                border-radius: 4px;
+                padding: 10px;
+                z-index: 1000;
+                color: white;
+                width: 150px; /* Or adjust as needed */
+            }
+
+            .settings-menu-header {
+                font-weight: bold;
+                margin-bottom: 8px;
+            }
+
+            .settings-option {
+                padding: 5px 10px;
+                cursor: pointer;
+                border-radius: 2px; /* Slight rounding for options */
+            }
+
+            .settings-option:hover {
+                background-color: #505050;
+            }
+
+            .settings-option.active {
+                background-color: #FF0000; /* YouTube red for active selection */
+                font-weight: bold;
             }
