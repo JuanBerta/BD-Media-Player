@@ -1,3 +1,6 @@
+const fs = require('fs');
+const path = require('path');
+
 const video = document.getElementById('video');
 const audio = document.getElementById('audio');
 const btnReproducir = document.getElementById('btnReproducir');
@@ -32,91 +35,237 @@ const miniplayerIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d=
 const miniplayerExitIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 19V4H5v15h14zm-2-4h-2v-2h2v-2h-2V9h2V7h-2V5h2v11z"></path></svg>'; // Example: Could be an X or styled differently
 const openFileIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>';
 
-var tipoArchivo
-var mediaActivo
-var nuevoMedia
+var tipoArchivo; // This might become less relevant if we rely on extensions more
+var mediaActivo;
+var nuevoMedia; // This also might be simplified
+
+// Playlist Variables
+let currentFolderPath = null;
+let currentPlaylistFromFolder = []; // Array of full file paths
+let currentFileIndexInFolder = -1;
+const mediaExtensions = ['.mp4', '.webm', '.mov', '.mkv', '.avi', // Video
+                         '.mp3', '.wav', '.ogg', '.flac', '.aac']; // Audio
+
+// Function to update the enabled/disabled state of Next/Previous buttons
+function updateNextPrevButtonStates() {
+    if (!currentPlaylistFromFolder || currentPlaylistFromFolder.length === 0) {
+        // No playlist
+        btnNextVideo.disabled = true;
+        btnReplay.classList.remove('has-previous'); // No "previous" functionality
+        // Update tooltip for btnReplay if it changes based on "previous" availability
+        // btnReplay.title = translate('replayTooltipSingleOnly'); 
+    } else if (currentPlaylistFromFolder.length === 1) {
+        // Playlist with only one file
+        btnNextVideo.disabled = true;
+        btnReplay.classList.remove('has-previous');
+        // btnReplay.title = translate('replayTooltipSingleOnly');
+    } else {
+        // Playlist exists and has more than one file
+        if (currentFileIndexInFolder >= currentPlaylistFromFolder.length - 1) {
+            btnNextVideo.disabled = true; // At the last file
+        } else {
+            btnNextVideo.disabled = false; // Not at the last file
+        }
+
+        if (currentFileIndexInFolder <= 0) {
+            // At the first file, "previous" action is disabled (or would loop to end)
+            btnReplay.classList.remove('has-previous');
+            // btnReplay.title = translate('replayTooltipSingleOnly');
+        } else {
+            btnReplay.classList.add('has-previous');
+            // btnReplay.title = translate('replayPrevTooltip'); // Or your combined tooltip
+        }
+    }
+     // Default tooltips are set in initializeIcons, this function primarily handles disabled state
+     // and the 'has-previous' class for styling.
+     // If specific tooltip changes are needed for these states, they would be added here.
+     // For now, ensure the original tooltip set in initializeIcons is appropriate for single replay
+     // and the .has-previous class can be used if more specific styling for "prev" is desired.
+}
+
+
+// Double Click Logic for Replay Button
+let replayClickTimeout = null;
+let replayClickCount = 0;
+const doubleClickDelay = 750; // milliseconds
+
+// Plays a specific file path. Assumes playlist context (currentPlaylistFromFolder, currentFileIndexInFolder) is already set if applicable.
+function playSpecificMediaFile(filePathToPlay) {
+    if (!filePathToPlay) {
+        console.warn("No file path provided to playSpecificMediaFile.");
+        return;
+    }
+
+    // 1. Determine media type and target element
+    const tipo = esVideoOAudioPath(filePathToPlay);
+    let targetMediaElement = (tipo === 'video') ? video : audio;
+    let otherMediaElement = (tipo === 'video') ? audio : video;
+
+    // 2. Cleanup old media
+    if (mediaActivo) {
+        cleanupMediaEventListeners(mediaActivo);
+        mediaActivo.pause();
+        mediaActivo.src = ''; // Clear src of old mediaActivo
+    }
+    // Ensure the non-active element is also fully reset
+    otherMediaElement.src = '';
+    otherMediaElement.removeAttribute('src');
+
+    // 3. Assign new media
+    mediaActivo = targetMediaElement;
+    mediaActivo.src = filePathToPlay; // Set src to the new file path
+    
+    setupMediaEventListeners(mediaActivo); // Add listeners
+    mediaActivo.load(); // Load the new media
+    mediaActivo.play().catch(e => console.warn("Error auto-playing media:", e)); // Play
+}
+
+// Sets up the playlist from a selected file's directory and then plays that file.
+function loadMediaAndSetupPlaylist(selectedFilePath, isInitialLoad = true) {
+    if (!selectedFilePath) {
+        console.warn("No file path provided to loadMediaAndSetupPlaylist.");
+        currentPlaylistFromFolder = [];
+        currentFileIndexInFolder = -1;
+        currentFolderPath = null;
+        updateNextPrevButtonStates(); // Update button states
+        return;
+    }
+
+    if (isInitialLoad) { // Only scan directory and build playlist on initial load
+        try {
+            currentFolderPath = path.dirname(selectedFilePath);
+            const allFilesInDir = fs.readdirSync(currentFolderPath);
+            currentPlaylistFromFolder = allFilesInDir
+                .map(f => path.join(currentFolderPath, f))
+                .filter(f => {
+                    try {
+                        const stat = fs.statSync(f);
+                        if (stat.isFile()) {
+                            const ext = path.extname(f).toLowerCase();
+                            return mediaExtensions.includes(ext);
+                        }
+                        return false;
+                    } catch (e) {
+                        console.warn(`Could not stat file ${f}: ${e.message}`);
+                        return false;
+                    }
+                })
+                .sort((a, b) => a.localeCompare(b));
+            
+            currentFileIndexInFolder = currentPlaylistFromFolder.findIndex(p => p === selectedFilePath);
+            console.log('Playlist from folder:', currentPlaylistFromFolder);
+            console.log('Current file index:', currentFileIndexInFolder);
+
+        } catch (e) {
+            console.error(`Error reading directory or processing files: ${e.message}`);
+            // Fallback: playlist is only the selected file, no valid folder context
+            currentPlaylistFromFolder = [selectedFilePath];
+            currentFileIndexInFolder = 0;
+            currentFolderPath = null;
+        }
+    }
+    // Now play the selected file (which might be the initially selected one or one from an existing playlist)
+    playSpecificMediaFile(selectedFilePath);
+    updateNextPrevButtonStates(); // Update button states after playlist is set up
+}
+
 
 btnSeleccionarArchivos.addEventListener('click', () => {
-    fileInput.click();
+    fileInput.click(); // Triggers the 'change' event below
 });
 
 fileInput.addEventListener('change', (event) => {
     const file = event.target.files[0];
     if (!file) return;
 
-    const url = URL.createObjectURL(file);
-    const tipoArchivo = file.type.split('/')[0];
-
-    // 1. Determinar el NUEVO medio (antes de limpiar el anterior)
-    let nuevoMedia;
-    if (tipoArchivo === 'video') {
-        nuevoMedia = video;
-    } else if (tipoArchivo === 'audio') {
-        nuevoMedia = audio;
+    if (file.path) { // file.path is available in Electron
+        loadMediaAndSetupPlaylist(file.path, true); // true for isInitialLoad
     } else {
-        console.error("Tipo de archivo no compatible.");
-        URL.revokeObjectURL(url);
-        return;
-    }
+        console.warn("File path not available from fileInput. Cannot create folder playlist. Loading as single file.");
+        // Fallback: Load the single file using Object URL (no playlist)
+        const url = URL.createObjectURL(file);
+        const tipo = esVideoOAudioType(file.type); // Use type for Object URL
+        
+        let targetMediaElement = (tipo === 'video') ? video : audio;
+        let otherMediaElement = (tipo === 'video') ? audio : video;
 
-    // 2. Limpiar el medio ACTIVO anterior (si existe)
-    if (mediaActivo) {
-        cleanupMediaEventListeners(mediaActivo);
-        mediaActivo.pause();
-        URL.revokeObjectURL(mediaActivo.src); // Revoke old URL
-        mediaActivo.src = ''; // Clear src
-        if (mediaActivo === video) { // Ensure the non-active element is also reset
-            audio.src = ''; audio.removeAttribute('src'); // Clear audio if video was active
-        } else {
-            video.src = ''; video.removeAttribute('src'); // Clear video if audio was active
+        if (mediaActivo) {
+            cleanupMediaEventListeners(mediaActivo);
+            mediaActivo.pause();
+            if (mediaActivo.src.startsWith('blob:')) URL.revokeObjectURL(mediaActivo.src);
+            mediaActivo.src = '';
         }
+        otherMediaElement.src = ''; 
+        otherMediaElement.removeAttribute('src');
+        
+        mediaActivo = targetMediaElement;
+        mediaActivo.src = url; // Keep using Object URL for this fallback
+        setupMediaEventListeners(mediaActivo);
+        mediaActivo.load();
+        mediaActivo.play().catch(e => console.warn("Error auto-playing media (fallback):", e));
+
+        currentPlaylistFromFolder = [];
+        currentFileIndexInFolder = -1;
+        currentFolderPath = null;
+        updateNextPrevButtonStates(); // Update buttons for single file case
     }
-
-    // 3. Asignar el NUEVO medio como ACTIVO (DESPUÉS de limpiar el anterior)
-    mediaActivo = nuevoMedia; // video or audio element
-
-    // 4. Asignar la nueva fuente
-    mediaActivo.src = url;
-    setupMediaEventListeners(mediaActivo); // Add listeners to the new mediaActivo
-    mediaActivo.load(); // Important: Call load() after setting src and adding listeners
+    fileInput.value = ''; // Reset file input to allow selecting the same file again
 });
 
-// Wrapper for file loading to ensure playOnLoad is correctly scoped if needed, though direct play might be fine
-function cargarArchivo(file) { // This function seems redundant now with the main fileInput listener
-    const url = URL.createObjectURL(file); // This URL should be revoked when media changes
-    const tipo = esVideoOAudio(file); // Determine type again, or pass from main listener
 
-    let targetMediaElement = video; // Default to video
-    if (tipo === 'audio') {
-        targetMediaElement = audio;
+// This function is now primarily for drag-and-drop, or if called directly elsewhere.
+// It needs to be adapted for the new playlist logic if file.path is available.
+function cargarArchivo(file) {
+    if (file.path) { // If path is available (e.g. from certain drag-drop scenarios in Electron)
+        loadMediaAndSetupPlaylist(file.path, true); // true for isInitialLoad
+    } else { // Fallback for drag-drop if file.path is not available
+        console.warn("File path not available from drag-and-drop. Loading as single file, no folder playlist.");
+        const url = URL.createObjectURL(file);
+        const tipo = esVideoOAudioType(file.type);
+        
+        let targetMediaElement = (tipo === 'video') ? video : audio;
+        let otherMediaElement = (tipo === 'video') ? audio : video;
+
+        if (mediaActivo) {
+            cleanupMediaEventListeners(mediaActivo);
+            mediaActivo.pause();
+            if (mediaActivo.src.startsWith('blob:')) URL.revokeObjectURL(mediaActivo.src);
+            mediaActivo.src = '';
+        }
+        otherMediaElement.src = ''; 
+        otherMediaElement.removeAttribute('src');
+
+        mediaActivo = targetMediaElement;
+        mediaActivo.src = url;
+        setupMediaEventListeners(mediaActivo);
+        mediaActivo.load();
+        mediaActivo.play().catch(e => console.warn("Error auto-playing media (drag-drop fallback):", e));
+        
+        currentPlaylistFromFolder = [];
+        currentFileIndexInFolder = -1;
+        currentFolderPath = null;
+        updateNextPrevButtonStates(); // Update buttons for single file case
     }
-    
-    // This function is problematic if called directly without full context of mediaActivo management
-    // For now, let's assume fileInput.eventListener is the primary way to load.
-    // If this function is still needed, it needs to integrate with mediaActivo and cleanup/setup listeners.
-    // Commenting out direct listener attachment here as it's handled by setupMediaEventListeners
-    // targetMediaElement.addEventListener('loadedmetadata', () => handleMetadataLoaded(targetMediaElement));
-    targetMediaElement.src = url;
-    targetMediaElement.load();
-    targetMediaElement.play().catch(e => console.error("Error playing media in cargarArchivo:", e));
 }
 
-function esVideoOAudio(file) {
-    if (!file.type) {
-        const extension = file.name.split('.').pop().toLowerCase();
-        if (['mp4', 'webm', 'ogg', 'mov'].includes(extension)) return 'video';
-        if (['mp3', 'wav', 'ogg'].includes(extension)) return 'audio';
-        return null;
-    }
 
-    if (file.type.startsWith('video/')) {
-        return 'video';
-    } else if (file.type.startsWith('audio/')) {
-        return 'audio';
-    } else {
-        return null;
-    }
+// Renamed to avoid confusion, using file path and extension
+function esVideoOAudioPath(filePath) {
+    if (!filePath) return null;
+    const extension = path.extname(filePath).toLowerCase();
+    if (['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.avi'].includes(extension)) return 'video';
+    if (['.mp3', '.wav', '.ogg', '.flac', '.aac'].includes(extension)) return 'audio'; // .ogg can be video or audio, context might be needed
+    return null;
 }
+
+// New function to determine type from MIME type string, for fallback
+function esVideoOAudioType(mimeType) {
+    if (!mimeType) return null;
+    if (mimeType.startsWith('video/')) return 'video';
+    if (mimeType.startsWith('audio/')) return 'audio';
+    return null;
+}
+
 
 // let playOnLoad; // This global variable is no longer used by the refactored listener setup.
 let volumenAnterior = 1;
@@ -494,6 +643,7 @@ function initializeIcons() {
     btnSeleccionarArchivos.title = translate('openFileTooltip');
 
     // Set icon and tooltip for replay button
+    // Set icon and tooltip for replay button
     btnReplay.innerHTML = replayIconSVG;
     btnReplay.title = translate('replayTooltip');
 
@@ -502,21 +652,80 @@ function initializeIcons() {
     btnNextVideo.title = translate('nextVideoTooltip'); // Assuming 'nextVideoTooltip' maps to "Next (n)"
 }
 
-// Replay Button Functionality
+// Replay Button Functionality (with Double Click for Previous)
 btnReplay.addEventListener('click', () => {
-    if (mediaActivo) {
-        mediaActivo.currentTime = 0;
-        if (mediaActivo.paused) { 
-            mediaActivo.play();
-        }
+    replayClickCount++;
+
+    if (replayClickTimeout) {
+        clearTimeout(replayClickTimeout);
     }
+
+    replayClickTimeout = setTimeout(() => {
+        if (replayClickCount === 1) {
+            // Single Click: Replay current media
+            console.log("Replay: Single click - Replaying current media.");
+            if (mediaActivo) {
+                mediaActivo.currentTime = 0;
+                if (mediaActivo.paused) {
+                    mediaActivo.play();
+                    // updatePlayButtonIcon() is called by 'onPlay' event
+                }
+            }
+        } else if (replayClickCount >= 2) {
+            // Double Click (or more): Play previous media
+            console.log("Replay: Double click - Playing previous media.");
+            if (currentPlaylistFromFolder && currentPlaylistFromFolder.length > 0 && currentFileIndexInFolder !== -1) {
+                if (currentFileIndexInFolder > 0) {
+                    currentFileIndexInFolder--;
+                    const prevFilePath = currentPlaylistFromFolder[currentFileIndexInFolder];
+                    console.log("Playing previous video:", prevFilePath);
+                    playSpecificMediaFile(prevFilePath); // This will trigger updateNextPrevButtonStates via loadMediaAndSetupPlaylist
+                                                        // or directly if playSpecificMediaFile is modified to call it.
+                                                        // For now, assume playSpecificMediaFile implicitly handles it or it's called after.
+                    updateNextPrevButtonStates(); // Explicitly call after index change
+                } else {
+                    console.log("Already at the first video in the folder.");
+                     updateNextPrevButtonStates(); // Still update, as state might change if it was previously not disabled
+                    // Optional: Play current video from start if it's the first in playlist
+                    if (mediaActivo) {
+                         mediaActivo.currentTime = 0;
+                         if (mediaActivo.paused) mediaActivo.play();
+                    }
+                }
+            } else {
+                console.log("No folder playlist available or current file index is invalid for previous video. Replaying current.");
+                 if (mediaActivo) { // Fallback to replay current if no playlist for previous
+                    mediaActivo.currentTime = 0;
+                    if (mediaActivo.paused) mediaActivo.play();
+                }
+            }
+        }
+        replayClickCount = 0; // Reset click count after action or timeout
+    }, doubleClickDelay);
 });
 
-// Next Video Button Placeholder Functionality
+// Next Video Button Functionality
 btnNextVideo.addEventListener('click', () => {
-    console.log("Next video button clicked - functionality pending user feedback on playlist/directory logic.");
-    alert("Next video functionality is not yet implemented. How should the 'next video' be determined?");
-    // Future implementation will depend on how the user wants to define "next".
+    if (currentPlaylistFromFolder && currentPlaylistFromFolder.length > 0 && currentFileIndexInFolder !== -1) {
+        if (currentFileIndexInFolder < currentPlaylistFromFolder.length - 1) {
+            currentFileIndexInFolder++;
+            const nextFilePath = currentPlaylistFromFolder[currentFileIndexInFolder];
+            console.log("Playing next video:", nextFilePath);
+            playSpecificMediaFile(nextFilePath); // This will trigger updateNextPrevButtonStates via loadMediaAndSetupPlaylist
+                                                // or directly if playSpecificMediaFile is modified to call it.
+            updateNextPrevButtonStates(); // Explicitly call after index change
+        } else {
+            console.log("Already at the last video in the folder.");
+            updateNextPrevButtonStates(); // Still update, as state might change if it was previously not disabled
+            // Optional: Implement looping to the first video if desired by user.
+            // if (bucle && currentPlaylistFromFolder.length > 0) {
+            //     currentFileIndexInFolder = 0;
+            //     playSpecificMediaFile(currentPlaylistFromFolder[currentFileIndexInFolder]);
+            // }
+        }
+    } else {
+        console.log("No folder playlist available or current file index is invalid.");
+    }
 });
 
 // Call initialization

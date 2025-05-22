@@ -235,3 +235,13 @@ html,
                 background-color: #FF0000; /* YouTube red for active selection */
                 font-weight: bold;
             }
+
+            .controles button:disabled {
+                opacity: 0.5;
+                cursor: not-allowed;
+            }
+
+            /* Optional: Styling for btnReplay when "previous" is available via has-previous class */
+            /* .controles #btnReplay.has-previous { */
+                /* For example, a slightly different border or subtle background hint if desired */
+            /* } */
