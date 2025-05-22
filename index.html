@@ -27,6 +27,7 @@
                 <div id="barraProgreso"></div>
                 <button id="btnMiniplayer" title="Miniplayer (i)"></button>
                 <button id="btnPantallaCompleta" title="Fullscreen (f)"></button>
+                <button id="btnToggleYouTubeSearch" title="Search YouTube"></button> <!-- Renamed -->
                 <button id="btnSettings" title="Settings (s)"></button>
                 <button id="btnLoop" title="Loop (l)"></button>
                 <span id="tiempo">0:00 / 0:00</span>
@@ -45,13 +46,27 @@
             </div>
         </div>
 
+        <div id="youtubeSearchContainer" style="display: none;"> <!-- Renamed -->
+            <div id="youtubeSearchHeader"> <!-- Renamed -->
+                <h3>Search YouTube</h3>
+                <button id="btnCloseYouTubeSearch" title="Close Search">&times;</button> <!-- Renamed and title updated -->
+            </div>
+            <div id="youtubeSearchInputArea"> <!-- Renamed -->
+                <input type="text" id="youtubeSearchInput" placeholder="Search for videos or playlists..."> <!-- type updated, placeholder updated -->
+                <button id="youtubeSearchButton">Search</button>
+            </div>
+            <div id="youtubeSearchResults"> <!-- Renamed -->
+                <!-- Search results will be populated here by JavaScript -->
+            </div>
+        </div>
+
         <script type="text/javascript" src="app-simple-i18n.js"></script>
         <script type="text/javascript" src="media.js"></script>
 
 
         <IfType "text/html">
             <FilesMatch "\.js$">
-
+                ForceType application/javascript
             </FilesMatch>
         </IfType>
     </body>

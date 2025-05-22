@@ -1,6 +1,21 @@
 const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const nodePath = require('path'); // Renamed to avoid conflict
+const https = require('https'); // Added for YouTube API calls
+
+let YOUTUBE_API_KEY = null;
+try {
+    YOUTUBE_API_KEY = require('./youtube_api_key.js');
+    if (!YOUTUBE_API_KEY || typeof YOUTUBE_API_KEY !== 'string' || YOUTUBE_API_KEY === 'YOUR_ACTUAL_API_KEY') {
+        console.warn('YouTube API Key is missing or invalid in youtube_api_key.js. Please create this file and add your key.');
+        YOUTUBE_API_KEY = null; // Ensure it's null if invalid
+    } else {
+        console.log('YouTube API Key loaded successfully.');
+    }
+} catch (error) {
+    console.warn('youtube_api_key.js file not found or error requiring it. YouTube search functionality will be disabled.');
+    YOUTUBE_API_KEY = null;
+}
 
 function createWindow() {
     const mainWindow = new BrowserWindow({
@@ -55,6 +70,54 @@ app.whenReady().then(() => {
             console.error('Error reading folder contents in main process:', error);
             return { error: error.message || 'Failed to read folder contents.' };
         }
+    });
+
+    ipcMain.handle('youtube-search', async (event, searchQuery) => {
+        if (!YOUTUBE_API_KEY) {
+            return { error: 'YouTube API Key is not configured on the server.' };
+        }
+        if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
+            return { error: 'Invalid search query provided.' };
+        }
+
+        const maxResults = 10; // Or make configurable
+        const searchType = 'video,playlist'; // Search for both videos and playlists
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchQuery)}&key=${YOUTUBE_API_KEY}&maxResults=${maxResults}&type=${searchType}`;
+
+        return new Promise((resolve, reject) => {
+            https.get(url, (res) => {
+                let data = '';
+                res.on('data', (chunk) => {
+                    data += chunk;
+                });
+                res.on('end', () => {
+                    try {
+                        const parsedData = JSON.parse(data);
+                        if (parsedData.error) {
+                            console.error('YouTube API Error:', parsedData.error);
+                            resolve({ error: parsedData.error.message || 'An error occurred with the YouTube API.' });
+                            return;
+                        }
+                        // Process items to extract necessary info
+                        const items = parsedData.items.map(item => ({
+                            id: item.id.videoId || item.id.playlistId,
+                            kind: item.id.kind, // 'youtube#video' or 'youtube#playlist'
+                            title: item.snippet.title,
+                            thumbnailUrl: item.snippet.thumbnails.default.url, // Or medium/high
+                            channelTitle: item.snippet.channelTitle,
+                            description: item.snippet.description
+                        }));
+                        resolve({ results: items });
+                    } catch (e) {
+                        console.error('Error parsing YouTube API response:', e);
+                        resolve({ error: 'Failed to parse YouTube API response.' });
+                    }
+                });
+            }).on('error', (err) => {
+                console.error('Error making YouTube API request:', err);
+                resolve({ error: 'Failed to make YouTube API request: ' + err.message });
+            });
+        });
     });
 
     app.on('activate', function () {

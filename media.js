@@ -1,5 +1,6 @@
 // const fs = require('fs'); // Removed
 // const path = require('path'); // Removed
+const { ipcRenderer } = require('electron');
 
 const video = document.getElementById('video');
 const audio = document.getElementById('audio');
@@ -21,9 +22,19 @@ const btnReplay = document.getElementById('btnReplay');
 const btnNextVideo = document.getElementById('btnNextVideo');
 const notificationArea = document.getElementById('notificationArea');
 
+// YouTube Search UI Elements
+const btnToggleYouTubeSearch = document.getElementById('btnToggleYouTubeSearch'); // Corrected ID
+const youtubeSearchContainer = document.getElementById('youtubeSearchContainer'); // Corrected ID
+const btnCloseYouTubeSearch = document.getElementById('btnCloseYouTubeSearch'); // Corrected ID
+const youtubeSearchInput = document.getElementById('youtubeSearchInput'); // Corrected ID
+const youtubeSearchButton = document.getElementById('youtubeSearchButton'); // Corrected ID
+const youtubeSearchResults = document.getElementById('youtubeSearchResults'); // Corrected ID
+// const youtubePlayerFrame = document.getElementById('youtubePlayerFrame'); // For later use
+
 let notificationTimeout = null; // To manage the timeout for hiding the message
 
 // SVG Icons - Refined to be more YouTube-like (ViewBox 24 24 for consistency)
+const youtubeIconSVG = '<svg viewBox="0 0 28 20"><path fill="#FF0000" d="M27.32 3.2c-.34-.95-.9-1.7-1.77-2.2C23.65.05 14.05.05 14.05.05s-9.6 0-11.5.95c-.87.5-1.42 1.25-1.77 2.2C0 5.15 0 10 0 10s0 4.85.7 6.8c.35.95.9 1.7 1.77 2.2C4.45 19.95 14.05 19.95 14.05 19.95s9.6 0 11.5-.95c.87-.5 1.42-1.25 1.77-2.2.7-1.95.7-6.8.7-6.8s0-4.85-.7-6.8z"></path><path fill="#FFFFFF" d="M11.25 14.3V5.7l6.75 4.3-6.75 4.3z"></path></svg>';
 const nextVideoIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg>';
 const replayIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"></path></svg>';
 const playIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>';
@@ -47,7 +58,7 @@ let currentFolderPath = null;
 let currentPlaylistFromFolder = []; // Array of full file paths
 let currentFileIndexInFolder = -1;
 const mediaExtensions = ['.mp4', '.webm', '.mov', '.mkv', '.avi', // Video
-    '.mp3', '.wav', '.ogg', '.flac', '.aac']; // Audio
+                         '.mp3', '.wav', '.ogg', '.flac', '.aac']; // Audio
 
 // Function to update the enabled/disabled state of Next/Previous buttons
 function updateNextPrevButtonStates() {
@@ -79,11 +90,11 @@ function updateNextPrevButtonStates() {
             // btnReplay.title = translate('replayPrevTooltip'); // Or your combined tooltip
         }
     }
-    // Default tooltips are set in initializeIcons, this function primarily handles disabled state
-    // and the 'has-previous' class for styling.
-    // If specific tooltip changes are needed for these states, they would be added here.
-    // For now, ensure the original tooltip set in initializeIcons is appropriate for single replay
-    // and the .has-previous class can be used if more specific styling for "prev" is desired.
+     // Default tooltips are set in initializeIcons, this function primarily handles disabled state
+     // and the 'has-previous' class for styling.
+     // If specific tooltip changes are needed for these states, they would be added here.
+     // For now, ensure the original tooltip set in initializeIcons is appropriate for single replay
+     // and the .has-previous class can be used if more specific styling for "prev" is desired.
 }
 
 
@@ -105,9 +116,9 @@ function playSpecificMediaFile(filePathToPlay) {
     if (!tipo) {
         const simpleBasename = filePathToPlay.substring(filePathToPlay.lastIndexOf('/') + 1).substring(filePathToPlay.lastIndexOf('\\') + 1);
         showUIMessage(`${translate('errorFileTypeNotSupported')}: ${simpleBasename}`, 'error');
-        if (mediaActivo) {
-            mediaActivo.src = '';
-            updatePlayButtonIcon();
+        if(mediaActivo) {
+            mediaActivo.src = ''; 
+            updatePlayButtonIcon(); 
             tiempo.textContent = "0:00 / 0:00";
             barraProgreso.style.background = `rgba(221, 221, 221, 0.5)`;
         }
@@ -115,7 +126,7 @@ function playSpecificMediaFile(filePathToPlay) {
         // currentPlaylistFromFolder = []; // Consider if this is desired behavior or if we should just skip
         // currentFileIndexInFolder = -1;
         updateNextPrevButtonStates();
-        return;
+        return; 
     }
     let targetMediaElement = (tipo === 'video') ? video : audio;
     let otherMediaElement = (tipo === 'video') ? audio : video;
@@ -133,7 +144,7 @@ function playSpecificMediaFile(filePathToPlay) {
     // 3. Assign new media
     mediaActivo = targetMediaElement;
     mediaActivo.src = filePathToPlay; // Set src to the new file path
-
+    
     setupMediaEventListeners(mediaActivo); // Add listeners
     mediaActivo.load(); // Load the new media
     mediaActivo.play().catch(e => console.warn("Error auto-playing media:", e)); // Play
@@ -163,18 +174,18 @@ async function loadMediaAndSetupPlaylist(selectedFilePath, isInitialLoad = true)
             } else {
                 currentPlaylistFromFolder = result.files;
                 currentFileIndexInFolder = currentPlaylistFromFolder.findIndex(p => p === selectedFilePath);
-                if (currentFileIndexInFolder === -1 && currentPlaylistFromFolder.length > 0) {
+                if (currentFileIndexInFolder === -1 && currentPlaylistFromFolder.length > 0) { 
                     // If selected file somehow not in list (e.g. main process filter diff), add it or select first
                     console.warn("Selected file not found in playlist returned from main process. Selecting first file or adding.");
                     if (!currentPlaylistFromFolder.includes(selectedFilePath)) {
-                        currentPlaylistFromFolder.unshift(selectedFilePath); // Add at beginning as a fallback
-                        currentPlaylistFromFolder.sort((a, b) => a.localeCompare(b)); // Re-sort
+                         currentPlaylistFromFolder.unshift(selectedFilePath); // Add at beginning as a fallback
+                         currentPlaylistFromFolder.sort((a,b) => a.localeCompare(b)); // Re-sort
                     }
                     currentFileIndexInFolder = currentPlaylistFromFolder.findIndex(p => p === selectedFilePath);
                     if (currentFileIndexInFolder === -1) currentFileIndexInFolder = 0; // Default to first if still not found
                 } else if (currentPlaylistFromFolder.length === 0) { // If IPC returned empty list
-                    currentPlaylistFromFolder = [selectedFilePath];
-                    currentFileIndexInFolder = 0;
+                     currentPlaylistFromFolder = [selectedFilePath];
+                     currentFileIndexInFolder = 0;
                 }
             }
         } catch (ipcError) {
@@ -191,7 +202,7 @@ async function loadMediaAndSetupPlaylist(selectedFilePath, isInitialLoad = true)
         currentPlaylistFromFolder = [];
         currentFileIndexInFolder = -1;
     }
-
+    
     // Now play the selected file (which might be the initially selected one or one from an existing playlist)
     // Ensure selectedFilePath is valid for playSpecificMediaFile, especially if playlist logic failed
     const fileToPlay = (currentPlaylistFromFolder && currentPlaylistFromFolder[currentFileIndexInFolder]) || selectedFilePath;
@@ -220,7 +231,7 @@ fileInput.addEventListener('change', (event) => {
         // Fallback: Load the single file using Object URL (no playlist)
         const url = URL.createObjectURL(file);
         const tipo = esVideoOAudioType(file.type); // Use type for Object URL
-
+        
         let targetMediaElement = (tipo === 'video') ? video : audio;
         let otherMediaElement = (tipo === 'video') ? audio : video;
 
@@ -230,9 +241,9 @@ fileInput.addEventListener('change', (event) => {
             if (mediaActivo.src.startsWith('blob:')) URL.revokeObjectURL(mediaActivo.src);
             mediaActivo.src = '';
         }
-        otherMediaElement.src = '';
+        otherMediaElement.src = ''; 
         otherMediaElement.removeAttribute('src');
-
+        
         mediaActivo = targetMediaElement;
         mediaActivo.src = url; // Keep using Object URL for this fallback
         setupMediaEventListeners(mediaActivo);
@@ -258,7 +269,7 @@ function cargarArchivo(file) {
         console.warn("File path not available from drag-and-drop. Loading as single file, no folder playlist."); // Keep console for debugging
         const url = URL.createObjectURL(file);
         const tipo = esVideoOAudioType(file.type);
-
+        
         let targetMediaElement = (tipo === 'video') ? video : audio;
         let otherMediaElement = (tipo === 'video') ? audio : video;
 
@@ -268,7 +279,7 @@ function cargarArchivo(file) {
             if (mediaActivo.src.startsWith('blob:')) URL.revokeObjectURL(mediaActivo.src);
             mediaActivo.src = '';
         }
-        otherMediaElement.src = '';
+        otherMediaElement.src = ''; 
         otherMediaElement.removeAttribute('src');
 
         mediaActivo = targetMediaElement;
@@ -276,7 +287,7 @@ function cargarArchivo(file) {
         setupMediaEventListeners(mediaActivo);
         mediaActivo.load();
         mediaActivo.play().catch(e => console.warn("Error auto-playing media (drag-drop fallback):", e));
-
+        
         currentPlaylistFromFolder = [];
         currentFileIndexInFolder = -1;
         currentFolderPath = null;
@@ -292,7 +303,7 @@ function esVideoOAudioPath(filePath) { // path module no longer available here
     const lastDot = filePath.lastIndexOf('.');
     if (lastDot === -1) return null; // No extension
     const extension = filePath.substring(lastDot).toLowerCase();
-
+    
     if (['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.avi'].includes(extension)) return 'video';
     if (['.mp3', '.wav', '.ogg', '.flac', '.aac'].includes(extension)) return 'audio';
     return null;
@@ -352,7 +363,7 @@ window.addEventListener("drop", function (e) {
 
     for (let file of files) {
         const fileTypeForDrop = esVideoOAudioType(file.type); // Check type based on MIME
-        if (fileTypeForDrop) {
+        if (fileTypeForDrop) { 
             cargarArchivo(file);
         } else {
             showUIMessage(`${translate('errorFileTypeNotSupported')}: ${file.name}`, 'error'); // Already using showUIMessage
@@ -426,14 +437,14 @@ const onEnded = () => {
 };
 
 // Placeholder for the new playOnLoad, to be attached dynamically
-let currentPlayOnLoad;
+let currentPlayOnLoad; 
 
 function setupMediaEventListeners(mediaElement) {
     // Define playOnLoad specific to this mediaElement instance
     currentPlayOnLoad = () => {
         // mediaElement.play(); // play() is called after load() in the main file input listener.
-        // Or, if not, it should be called here.
-        // For now, assuming play is handled by the main file load sequence.
+                             // Or, if not, it should be called here.
+                             // For now, assuming play is handled by the main file load sequence.
         isPlaying = true; // Should be set by 'play' event, but can be pre-emptive
         updatePlayButtonIcon();
         mediaElement.removeEventListener('loadedmetadata', currentPlayOnLoad); // Self-removing
@@ -516,9 +527,9 @@ window.addEventListener('languageChanged', () => {
         }
         // Update fullscreen and PiP tooltips as well, as they might depend on language
         if (document.fullscreenElement === mediaActivo) { // Check if current media is fullscreen
-            btnPantallaCompleta.title = translate('exitFullscreen') + ' (f)';
+             btnPantallaCompleta.title = translate('exitFullscreen') + ' (f)';
         } else {
-            btnPantallaCompleta.title = translate('fullscreen') + ' (f)';
+             btnPantallaCompleta.title = translate('fullscreen') + ' (f)';
         }
         if (mediaActivo.tagName === 'VIDEO') {
             if (document.pictureInPictureElement === mediaActivo) {
@@ -528,7 +539,7 @@ window.addEventListener('languageChanged', () => {
             }
         }
     } else {
-        // If no media is active, ensure play button shows 'play' icon and default tooltips
+         // If no media is active, ensure play button shows 'play' icon and default tooltips
         btnReproducir.innerHTML = playIconSVG;
         btnReproducir.title = translate('play') + ' (k)';
         // Other buttons would have their default titles from initializeIcons
@@ -673,7 +684,7 @@ function initializeIcons() {
     btnPantallaCompleta.title = (document.fullscreenElement ? translate('exitFullscreen') : translate('fullscreen')) + ' (f)';
     btnSettings.innerHTML = settingsIconSVG;
     btnSettings.title = translate('settings') + ' (s)';
-
+    
     // PiP icon depends on video and its current PiP state
     if (mediaActivo && mediaActivo.tagName === 'VIDEO' && document.pictureInPictureElement === mediaActivo) {
         btnMiniplayer.innerHTML = miniplayerExitIconSVG;
@@ -694,7 +705,12 @@ function initializeIcons() {
 
     // Set icon and tooltip for next video button
     btnNextVideo.innerHTML = nextVideoIconSVG;
-    btnNextVideo.title = translate('nextVideoTooltip'); // Assuming 'nextVideoTooltip' maps to "Next (n)"
+    btnNextVideo.title = translate('nextVideoTooltip'); 
+
+    if (btnToggleYouTubeSearch) { // Check if the button exists
+        btnToggleYouTubeSearch.innerHTML = youtubeIconSVG;
+        btnToggleYouTubeSearch.title = translate('searchYouTubeTooltip'); // Assuming 'searchYouTubeTooltip' is a key
+    }
 }
 
 // Replay Button Functionality (with Double Click for Previous)
@@ -724,21 +740,21 @@ btnReplay.addEventListener('click', () => {
                     currentFileIndexInFolder--;
                     const prevFilePath = currentPlaylistFromFolder[currentFileIndexInFolder];
                     console.log("Playing previous video:", prevFilePath);
-                    playSpecificMediaFile(prevFilePath);
-                    updateNextPrevButtonStates();
+            playSpecificMediaFile(prevFilePath); 
+            updateNextPrevButtonStates(); 
                 } else {
-                    showUIMessage(translate('infoFirstVideoInPlaylist'), 'info'); // Already using showUIMessage
-                    console.log("Already at the first video in the folder."); // Keep console for debugging
-                    updateNextPrevButtonStates();
+            showUIMessage(translate('infoFirstVideoInPlaylist'), 'info'); // Already using showUIMessage
+            console.log("Already at the first video in the folder."); // Keep console for debugging
+            updateNextPrevButtonStates(); 
                     if (mediaActivo) {
-                        mediaActivo.currentTime = 0;
-                        if (mediaActivo.paused) mediaActivo.play();
+                         mediaActivo.currentTime = 0;
+                         if (mediaActivo.paused) mediaActivo.play();
                     }
                 }
             } else {
-                showUIMessage(translate('infoNoPlaylistForPrevious'), 'info'); // Already using showUIMessage
-                console.log("No folder playlist available or current file index is invalid for previous video. Replaying current."); // Keep console for debugging
-                if (mediaActivo) {
+        showUIMessage(translate('infoNoPlaylistForPrevious'), 'info'); // Already using showUIMessage
+        console.log("No folder playlist available or current file index is invalid for previous video. Replaying current."); // Keep console for debugging
+         if (mediaActivo) { 
                     mediaActivo.currentTime = 0;
                     if (mediaActivo.paused) mediaActivo.play();
                 }
@@ -756,12 +772,12 @@ btnNextVideo.addEventListener('click', () => {
             currentFileIndexInFolder++;
             const nextFilePath = currentPlaylistFromFolder[currentFileIndexInFolder];
             console.log("Playing next video:", nextFilePath); // Keep for debugging
-            playSpecificMediaFile(nextFilePath);
-            updateNextPrevButtonStates();
+            playSpecificMediaFile(nextFilePath); 
+            updateNextPrevButtonStates(); 
         } else {
             showUIMessage(translate('infoLastVideoInPlaylist'), 'info'); // Already using showUIMessage
             console.log("Already at the last video in the folder."); // Keep for debugging
-            updateNextPrevButtonStates();
+            updateNextPrevButtonStates(); 
             // Optional: Implement looping to the first video if desired by user.
             // if (bucle && currentPlaylistFromFolder.length > 0) { // Check against 'bucle' for loop playlist
             //     currentFileIndexInFolder = 0;
@@ -781,6 +797,153 @@ initializeIcons();
 // video.addEventListener('ended', onEnded); // Now added in setupMediaEventListeners
 // audio.addEventListener('ended', onEnded); // Now added in setupMediaEventListeners
 
+// --- YouTube Search Panel Event Listeners ---
+if (btnToggleYouTubeSearch && youtubeSearchContainer) {
+    btnToggleYouTubeSearch.addEventListener('click', () => {
+        const isHidden = youtubeSearchContainer.style.display === 'none' || youtubeSearchContainer.style.display === '';
+        youtubeSearchContainer.style.display = isHidden ? 'flex' : 'none'; // Use flex as per CSS
+        if (isHidden) {
+            if (mediaActivo && !mediaActivo.paused) {
+                mediaActivo.pause(); // Pause main video if playing
+            }
+            if (youtubeSearchInput) youtubeSearchInput.focus(); // Auto-focus search input
+        }
+    });
+}
+
+if (btnCloseYouTubeSearch && youtubeSearchContainer) {
+    btnCloseYouTubeSearch.addEventListener('click', () => {
+        youtubeSearchContainer.style.display = 'none';
+    });
+}
+
+// Placeholder for actual YouTube search functionality (will be in next subtask)
+async function performYouTubeSearch() {
+    const query = youtubeSearchInput.value.trim();
+    if (!query) {
+        showUIMessage('Please enter a search term.', 'info'); // Using existing showUIMessage
+        return;
+    }
+    if (youtubeSearchResults) youtubeSearchResults.innerHTML = `<p>${translate('searching')}</p>`; // Show loading indicator
+
+    // This part will be expanded in the next subtask
+    // console.log(`Simulating YouTube search for: ${query}`);
+    try {
+        const apiResponse = await window.electronAPI.invoke('youtube-search', query);
+        clearUIMessage(); // Clear "Searching..." message
+
+        if (apiResponse.error) {
+            showUIMessage(`${translate('youtubeSearchError')}: ${apiResponse.error}`, 'error', 7000);
+            if (youtubeSearchResults) youtubeSearchResults.innerHTML = `<p class="youtube-result-error">${translate('searchFailed')}</p>`;
+        } else if (apiResponse.results && apiResponse.results.length > 0) { 
+            // Message is now handled by displayYouTubeResults or lack of results below
+            displayYouTubeResults(apiResponse); // Call the new display function
+        } else { // No results from API, but not an API error
+            showUIMessage(translate('noResultsFound'), 'info', 3000);
+            if (youtubeSearchResults) youtubeSearchResults.innerHTML = `<p class="youtube-result-info">${translate('noResultsFound')}</p>`;
+        }
+    } catch (ipcError) {
+        clearUIMessage();
+        showUIMessage(`${translate('ipcErrorYouTubeSearch')}: ${ipcError.message}`, 'error', 7000);
+        if (youtubeSearchResults) youtubeSearchResults.innerHTML = `<p class="youtube-result-error">${translate('searchFailedIPC')}</p>`;
+        console.error("IPC Error during YouTube search:", ipcError);
+    }
+}
+
+function displayYouTubeResults(apiResponse) {
+    if (!youtubeSearchResults) return;
+    youtubeSearchResults.innerHTML = ''; // Clear previous results
+
+    if (apiResponse.error) {
+        // This case is now primarily handled by showUIMessage in performYouTubeSearch,
+        // but displaying a message in the results area is still good.
+        const errorP = document.createElement('p');
+        errorP.textContent = `${translate('youtubeSearchError')}: ${apiResponse.error}`;
+        errorP.className = 'youtube-result-error'; // Ensure this class is styled
+        youtubeSearchResults.appendChild(errorP);
+        return;
+    }
+
+    const items = apiResponse.results;
+
+    if (!items || items.length === 0) {
+        const noResultsP = document.createElement('p');
+        noResultsP.textContent = translate('noResultsFound'); // Use a translatable key
+        noResultsP.className = 'youtube-result-info'; // Ensure this class is styled
+        youtubeSearchResults.appendChild(noResultsP);
+        return;
+    }
+
+    items.forEach(item => {
+        const resultDiv = document.createElement('div');
+        resultDiv.className = 'youtube-result-item';
+        
+        if (item.kind === 'youtube#video') {
+            resultDiv.dataset.videoId = item.id;
+            resultDiv.dataset.itemType = 'video';
+        } else if (item.kind === 'youtube#playlist') {
+            resultDiv.dataset.playlistId = item.id;
+            resultDiv.dataset.itemType = 'playlist';
+        } else {
+            console.warn('Unknown item kind:', item.kind, item);
+            return; // Skip this item
+        }
+
+        const thumbnailImg = document.createElement('img');
+        thumbnailImg.src = item.thumbnailUrl;
+        thumbnailImg.alt = item.title; // Alt text for accessibility
+        thumbnailImg.className = 'youtube-result-thumbnail';
+
+        const textInfoDiv = document.createElement('div');
+        textInfoDiv.className = 'youtube-result-text';
+
+        const titleH4 = document.createElement('h4');
+        titleH4.textContent = item.title;
+        titleH4.className = 'youtube-result-title';
+
+        const channelP = document.createElement('p');
+        channelP.textContent = item.channelTitle;
+        channelP.className = 'youtube-result-channel';
+        
+        // Optional: Add description (truncated)
+        // const descriptionP = document.createElement('p');
+        // descriptionP.textContent = item.description ? (item.description.substring(0, 100) + (item.description.length > 100 ? '...' : '')) : '';
+        // descriptionP.className = 'youtube-result-description';
+
+        textInfoDiv.appendChild(titleH4);
+        textInfoDiv.appendChild(channelP);
+        // textInfoDiv.appendChild(descriptionP);
+
+        resultDiv.appendChild(thumbnailImg);
+        resultDiv.appendChild(textInfoDiv);
+
+        resultDiv.addEventListener('click', () => {
+            const videoId = resultDiv.dataset.videoId;
+            const playlistId = resultDiv.dataset.playlistId;
+            const itemType = resultDiv.dataset.itemType;
+            // Placeholder for playback functionality
+            showUIMessage(`Playback for ${itemType} ID: ${videoId || playlistId} will be implemented next.`, 'info', 4000);
+            console.log(`Clicked on ${itemType}: ID ${videoId || playlistId}`);
+            // Future: Call a function to load and play this YouTube content.
+        });
+        youtubeSearchResults.appendChild(resultDiv);
+    });
+}
+
+if (youtubeSearchButton) {
+    youtubeSearchButton.addEventListener('click', performYouTubeSearch);
+}
+
+if (youtubeSearchInput) {
+    youtubeSearchInput.addEventListener('keypress', (event) => {
+        if (event.key === 'Enter') {
+            event.preventDefault(); 
+            performYouTubeSearch();
+        }
+    });
+}
+
+
 // --- UI Message Function ---
 function showUIMessage(message, type = 'info', duration = 3000) {
     if (!notificationArea) {
@@ -792,9 +955,9 @@ function showUIMessage(message, type = 'info', duration = 3000) {
     // Reset classes to base and type-specific, then add 'show'
     notificationArea.className = 'notification-area'; // Reset
     notificationArea.classList.add(type); // 'info', 'error', or 'success'
-
+    
     // Trigger reflow to ensure transition plays on new 'show'
-    void notificationArea.offsetWidth;
+    void notificationArea.offsetWidth; 
 
     notificationArea.classList.add('show');
 
@@ -808,6 +971,17 @@ function showUIMessage(message, type = 'info', duration = 3000) {
         notificationArea.classList.remove('show');
         // The CSS transition will handle display:none after opacity fades out
     }, duration);
+}
+
+function clearUIMessage() {
+    if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+        notificationTimeout = null;
+    }
+    if (notificationArea) {
+        notificationArea.classList.remove('show');
+        // CSS transition handles the display:none
+    }
 }
 
 // Keyboard Shortcuts

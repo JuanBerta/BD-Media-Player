@@ -282,3 +282,132 @@ html,
                background-color: rgba(25, 135, 84, 0.9); /* Bootstrap success green */
                color: white;
             }
+
+            /* YouTube Search Panel Styles */
+            #youtubeSearchContainer {
+                position: fixed;
+                top: 0;
+                left: 0;
+                width: 100%;
+                height: 100%;
+                background-color: rgba(24, 24, 24, 0.98); /* Dark overlay, similar to body */
+                z-index: 10000; /* High z-index to cover everything */
+                color: #fff;
+                padding: 20px;
+                box-sizing: border-box;
+                overflow-y: auto;
+                display: none; /* Initially hidden */
+            }
+
+            #youtubeSearchHeader {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                margin-bottom: 15px;
+                border-bottom: 1px solid #444;
+                padding-bottom: 10px;
+            }
+
+            #youtubeSearchHeader h3 {
+                margin: 0;
+                font-size: 1.5em;
+            }
+
+            #btnCloseYouTubeSearch {
+                background: none;
+                border: none;
+                color: #fff;
+                font-size: 2em;
+                cursor: pointer;
+                padding: 0 10px;
+            }
+            #btnCloseYouTubeSearch:hover { /* Added specific hover for close button */
+                color: #FF0000; /* YouTube red or other highlight */
+            }
+
+            #youtubeSearchInputArea {
+                display: flex;
+                margin-bottom: 20px;
+            }
+
+            #youtubeSearchInput {
+                flex-grow: 1;
+                padding: 10px;
+                border: 1px solid #555;
+                background-color: #333;
+                color: #fff;
+                border-radius: 3px 0 0 3px;
+                font-size: 1em;
+            }
+
+            #youtubeSearchButton { 
+                padding: 10px 15px;
+                border: 1px solid #555;
+                border-left: none;
+                background-color: #c00; /* YouTube Red */
+                color: white;
+                cursor: pointer;
+                border-radius: 0 3px 3px 0;
+                font-size: 1em;
+            }
+            #youtubeSearchButton:hover {
+               background-color: #e00;
+            }
+
+            #youtubeSearchResults {
+                display: flex;
+                flex-direction: column; /* Or grid, or flex-wrap for multiple columns */
+                gap: 15px; /* Space between items */
+                margin-top: 10px;
+                max-height: calc(100vh - 200px); /* Example: adjust based on header/input height */
+                overflow-y: auto;
+            }
+            .youtube-result-item {
+                display: flex;
+                align-items: flex-start; /* Align items to the top */
+                cursor: pointer;
+                background-color: #282828; /* Slightly lighter than main search bg */
+                padding: 10px;
+                border-radius: 4px;
+                transition: background-color 0.2s ease-in-out;
+            }
+            .youtube-result-item:hover {
+                background-color: #383838;
+            }
+            .youtube-result-thumbnail {
+                width: 120px; /* Standard YouTube thumbnail width for small lists */
+                height: 90px; /* Standard 4:3 or 16:9 aspect ratio */
+                object-fit: cover;
+                border-radius: 2px;
+                margin-right: 10px;
+                flex-shrink: 0; /* Prevent thumbnail from shrinking */
+            }
+            .youtube-result-text {
+                display: flex;
+                flex-direction: column;
+                gap: 4px;
+                flex-grow: 1; /* Allow text to take remaining space */
+                min-width: 0; /* Important for text ellipsis if titles are too long */
+            }
+            .youtube-result-title {
+                font-size: 1em;
+                color: #fff;
+                margin: 0;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .youtube-result-channel, .youtube-result-description {
+                font-size: 0.85em;
+                color: #aaa;
+                margin: 0;
+                white-space: nowrap;
+                overflow: hidden;
+                text-overflow: ellipsis;
+            }
+            .youtube-result-error, .youtube-result-info {
+                text-align: center;
+                padding: 20px;
+                font-size: 1.1em;
+                color: #ccc;
+            }
