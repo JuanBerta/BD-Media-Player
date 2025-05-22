@@ -1,5 +1,6 @@
-const fs = require('fs');
-const path = require('path');
+// const fs = require('fs'); // Removed
+// const path = require('path'); // Removed
+const { ipcRenderer } = require('electron');
 
 const video = document.getElementById('video');
 const audio = document.getElementById('audio');
@@ -121,51 +122,64 @@ function playSpecificMediaFile(filePathToPlay) {
 }
 
 // Sets up the playlist from a selected file's directory and then plays that file.
-function loadMediaAndSetupPlaylist(selectedFilePath, isInitialLoad = true) {
+async function loadMediaAndSetupPlaylist(selectedFilePath, isInitialLoad = true) {
     if (!selectedFilePath) {
         console.warn("No file path provided to loadMediaAndSetupPlaylist.");
         currentPlaylistFromFolder = [];
         currentFileIndexInFolder = -1;
-        currentFolderPath = null;
+        // currentFolderPath = null; // Not directly available from renderer anymore
         updateNextPrevButtonStates(); // Update button states
         return;
     }
 
-    if (isInitialLoad) { // Only scan directory and build playlist on initial load
+    if (isInitialLoad && selectedFilePath) { // Only if it's an initial load and we have a path
         try {
-            currentFolderPath = path.dirname(selectedFilePath);
-            const allFilesInDir = fs.readdirSync(currentFolderPath);
-            currentPlaylistFromFolder = allFilesInDir
-                .map(f => path.join(currentFolderPath, f))
-                .filter(f => {
-                    try {
-                        const stat = fs.statSync(f);
-                        if (stat.isFile()) {
-                            const ext = path.extname(f).toLowerCase();
-                            return mediaExtensions.includes(ext);
-                        }
-                        return false;
-                    } catch (e) {
-                        console.warn(`Could not stat file ${f}: ${e.message}`);
-                        return false;
-                    }
-                })
-                .sort((a, b) => a.localeCompare(b));
-            
-            currentFileIndexInFolder = currentPlaylistFromFolder.findIndex(p => p === selectedFilePath);
-            console.log('Playlist from folder:', currentPlaylistFromFolder);
-            console.log('Current file index:', currentFileIndexInFolder);
+            console.log(`Requesting folder contents for file: ${selectedFilePath}`);
+            const result = await ipcRenderer.invoke('get-folder-contents', selectedFilePath);
 
-        } catch (e) {
-            console.error(`Error reading directory or processing files: ${e.message}`);
-            // Fallback: playlist is only the selected file, no valid folder context
-            currentPlaylistFromFolder = [selectedFilePath];
+            if (result.error) {
+                console.error('Error getting folder contents via IPC:', result.error);
+                currentPlaylistFromFolder = [selectedFilePath]; // Fallback: playlist is just the selected file
+                currentFileIndexInFolder = 0;
+            } else {
+                currentPlaylistFromFolder = result.files;
+                currentFileIndexInFolder = currentPlaylistFromFolder.findIndex(p => p === selectedFilePath);
+                if (currentFileIndexInFolder === -1 && currentPlaylistFromFolder.length > 0) { 
+                    // If selected file somehow not in list (e.g. main process filter diff), add it or select first
+                    console.warn("Selected file not found in playlist returned from main process. Selecting first file or adding.");
+                    if (!currentPlaylistFromFolder.includes(selectedFilePath)) {
+                         currentPlaylistFromFolder.unshift(selectedFilePath); // Add at beginning as a fallback
+                         currentPlaylistFromFolder.sort((a,b) => a.localeCompare(b)); // Re-sort
+                    }
+                    currentFileIndexInFolder = currentPlaylistFromFolder.findIndex(p => p === selectedFilePath);
+                    if (currentFileIndexInFolder === -1) currentFileIndexInFolder = 0; // Default to first if still not found
+                } else if (currentPlaylistFromFolder.length === 0) { // If IPC returned empty list
+                     currentPlaylistFromFolder = [selectedFilePath];
+                     currentFileIndexInFolder = 0;
+                }
+            }
+        } catch (ipcError) {
+            console.error('IPC invoke failed for get-folder-contents:', ipcError);
+            currentPlaylistFromFolder = [selectedFilePath]; // Fallback
             currentFileIndexInFolder = 0;
-            currentFolderPath = null;
         }
+        console.log('Playlist from folder (via IPC):', currentPlaylistFromFolder);
+        console.log('Current file index:', currentFileIndexInFolder);
+        // currentFolderPath is now implicitly known by the main process, not stored here unless needed for other reasons
+    } else if (!selectedFilePath && isInitialLoad) {
+        // No path, clear playlist (e.g. if drag-drop didn't provide path AND no ObjectURL fallback handled it)
+        currentPlaylistFromFolder = [];
+        currentFileIndexInFolder = -1;
     }
+    
     // Now play the selected file (which might be the initially selected one or one from an existing playlist)
-    playSpecificMediaFile(selectedFilePath);
+    // Ensure selectedFilePath is valid for playSpecificMediaFile, especially if playlist logic failed
+    const fileToPlay = (currentPlaylistFromFolder && currentPlaylistFromFolder[currentFileIndexInFolder]) || selectedFilePath;
+    if (fileToPlay) {
+        playSpecificMediaFile(fileToPlay);
+    } else {
+        console.error("No valid file to play after playlist setup attempt.");
+    }
     updateNextPrevButtonStates(); // Update button states after playlist is set up
 }
 
@@ -250,11 +264,15 @@ function cargarArchivo(file) {
 
 
 // Renamed to avoid confusion, using file path and extension
-function esVideoOAudioPath(filePath) {
+function esVideoOAudioPath(filePath) { // path module no longer available here
     if (!filePath) return null;
-    const extension = path.extname(filePath).toLowerCase();
+    // Basic extension extraction without path module
+    const lastDot = filePath.lastIndexOf('.');
+    if (lastDot === -1) return null; // No extension
+    const extension = filePath.substring(lastDot).toLowerCase();
+    
     if (['.mp4', '.webm', '.ogg', '.mov', '.mkv', '.avi'].includes(extension)) return 'video';
-    if (['.mp3', '.wav', '.ogg', '.flac', '.aac'].includes(extension)) return 'audio'; // .ogg can be video or audio, context might be needed
+    if (['.mp3', '.wav', '.ogg', '.flac', '.aac'].includes(extension)) return 'audio';
     return null;
 }
 
