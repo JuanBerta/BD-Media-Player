@@ -19,7 +19,10 @@ const settingsMenu = document.getElementById('settingsMenu');
 const playbackSpeedOptionsContainer = document.getElementById('playbackSpeedOptions');
 const btnMiniplayer = document.getElementById('btnMiniplayer');
 const btnReplay = document.getElementById('btnReplay');
-const btnNextVideo = document.getElementById('btnNextVideo'); // Added Next Video Button
+const btnNextVideo = document.getElementById('btnNextVideo');
+const notificationArea = document.getElementById('notificationArea');
+
+let notificationTimeout = null; // To manage the timeout for hiding the message
 
 // SVG Icons - Refined to be more YouTube-like (ViewBox 24 24 for consistency)
 const nextVideoIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg>';
@@ -93,12 +96,28 @@ const doubleClickDelay = 750; // milliseconds
 // Plays a specific file path. Assumes playlist context (currentPlaylistFromFolder, currentFileIndexInFolder) is already set if applicable.
 function playSpecificMediaFile(filePathToPlay) {
     if (!filePathToPlay) {
-        console.warn("No file path provided to playSpecificMediaFile.");
+        showUIMessage(translate('errorNoFilePath'), 'error'); // Using translate for message
+        console.warn("No file path provided to playSpecificMediaFile."); // Keep console for debugging
         return;
     }
 
     // 1. Determine media type and target element
     const tipo = esVideoOAudioPath(filePathToPlay);
+    if (!tipo) {
+        const simpleBasename = filePathToPlay.substring(filePathToPlay.lastIndexOf('/') + 1).substring(filePathToPlay.lastIndexOf('\\') + 1);
+        showUIMessage(`${translate('errorFileTypeNotSupported')}: ${simpleBasename}`, 'error');
+        if(mediaActivo) {
+            mediaActivo.src = ''; 
+            updatePlayButtonIcon(); 
+            tiempo.textContent = "0:00 / 0:00";
+            barraProgreso.style.background = `rgba(221, 221, 221, 0.5)`;
+        }
+        // Clear playlist if the current file is unplayable, as navigation might be broken
+        // currentPlaylistFromFolder = []; // Consider if this is desired behavior or if we should just skip
+        // currentFileIndexInFolder = -1;
+        updateNextPrevButtonStates();
+        return; 
+    }
     let targetMediaElement = (tipo === 'video') ? video : audio;
     let otherMediaElement = (tipo === 'video') ? audio : video;
 
@@ -135,10 +154,11 @@ async function loadMediaAndSetupPlaylist(selectedFilePath, isInitialLoad = true)
     if (isInitialLoad && selectedFilePath) { // Only if it's an initial load and we have a path
         try {
             console.log(`Requesting folder contents for file: ${selectedFilePath}`);
-            const result = await ipcRenderer.invoke('get-folder-contents', selectedFilePath);
+            const result = await window.electronAPI.invoke('get-folder-contents', selectedFilePath); // Use window.electronAPI
 
             if (result.error) {
-                console.error('Error getting folder contents via IPC:', result.error);
+                showUIMessage(`${translate('errorLoadingFolder')}: ${result.error}`, 'error'); // Already using showUIMessage
+                console.error('Error getting folder contents via IPC:', result.error); // Keep console for debugging
                 currentPlaylistFromFolder = [selectedFilePath]; // Fallback: playlist is just the selected file
                 currentFileIndexInFolder = 0;
             } else {
@@ -159,11 +179,12 @@ async function loadMediaAndSetupPlaylist(selectedFilePath, isInitialLoad = true)
                 }
             }
         } catch (ipcError) {
-            console.error('IPC invoke failed for get-folder-contents:', ipcError);
+            showUIMessage(`${translate('errorIPC')} ${ipcError.message}`, 'error'); // Already using showUIMessage
+            console.error('IPC invoke failed for get-folder-contents:', ipcError); // Keep console for debugging
             currentPlaylistFromFolder = [selectedFilePath]; // Fallback
             currentFileIndexInFolder = 0;
         }
-        console.log('Playlist from folder (via IPC):', currentPlaylistFromFolder);
+        // console.log('Playlist from folder (via IPC):', currentPlaylistFromFolder);
         console.log('Current file index:', currentFileIndexInFolder);
         // currentFolderPath is now implicitly known by the main process, not stored here unless needed for other reasons
     } else if (!selectedFilePath && isInitialLoad) {
@@ -195,7 +216,8 @@ fileInput.addEventListener('change', (event) => {
     if (file.path) { // file.path is available in Electron
         loadMediaAndSetupPlaylist(file.path, true); // true for isInitialLoad
     } else {
-        console.warn("File path not available from fileInput. Cannot create folder playlist. Loading as single file.");
+        showUIMessage(translate('infoFilePathNotAvailable'), 'info', 5000); // Already using showUIMessage
+        console.warn("File path not available from fileInput. Cannot create folder playlist. Loading as single file."); // Keep console for debugging
         // Fallback: Load the single file using Object URL (no playlist)
         const url = URL.createObjectURL(file);
         const tipo = esVideoOAudioType(file.type); // Use type for Object URL
@@ -233,7 +255,8 @@ function cargarArchivo(file) {
     if (file.path) { // If path is available (e.g. from certain drag-drop scenarios in Electron)
         loadMediaAndSetupPlaylist(file.path, true); // true for isInitialLoad
     } else { // Fallback for drag-drop if file.path is not available
-        console.warn("File path not available from drag-and-drop. Loading as single file, no folder playlist.");
+        showUIMessage(translate('infoDragDropPathNotAvailable'), 'info', 5000); // Already using showUIMessage
+        console.warn("File path not available from drag-and-drop. Loading as single file, no folder playlist."); // Keep console for debugging
         const url = URL.createObjectURL(file);
         const tipo = esVideoOAudioType(file.type);
         
@@ -329,10 +352,12 @@ window.addEventListener("drop", function (e) {
     }
 
     for (let file of files) {
-        if (file.type.startsWith("audio/") || file.type.startsWith("video/")) { // Ajusta los tipos según sea necesario
+        const fileTypeForDrop = esVideoOAudioType(file.type); // Check type based on MIME
+        if (fileTypeForDrop) { 
             cargarArchivo(file);
         } else {
-            console.warn(`El archivo ${file.name} no es compatible.`);
+            showUIMessage(`${translate('errorFileTypeNotSupported')}: ${file.name}`, 'error'); // Already using showUIMessage
+            console.warn(`El archivo ${file.name} no es compatible.`); // Keep console for debugging
         }
     }
 
@@ -563,8 +588,9 @@ btnPantallaCompleta.addEventListener('click', function () {
 // });
 
 btnMiniplayer.addEventListener('click', async () => {
-    if (!mediaActivo || mediaActivo.tagName !== 'VIDEO') { // Only for video
-        console.warn('Miniplayer is only available for video content.');
+    if (!mediaActivo || mediaActivo.tagName !== 'VIDEO') {
+        showUIMessage(translate('infoMiniplayerOnlyVideo'), 'info'); // Already using showUIMessage
+        console.warn('Miniplayer is only available for video content.'); // Keep console for debugging
         return;
     }
 
@@ -575,11 +601,13 @@ btnMiniplayer.addEventListener('click', async () => {
             if (document.pictureInPictureEnabled) {
                 await mediaActivo.requestPictureInPicture();
             } else {
-                console.warn('Picture-in-Picture is not enabled in this browser/document.');
+                showUIMessage(translate('errorPipNotEnabled'), 'info', 4000); // Already using showUIMessage
+                console.warn('Picture-in-Picture is not enabled in this browser/document.'); // Keep console for debugging
             }
         }
     } catch (error) {
-        console.error('Error handling Picture-in-Picture:', error);
+        showUIMessage(`${translate('errorPip')} ${error.message}`, 'error'); // Already using showUIMessage
+        console.error('Error handling Picture-in-Picture:', error); // Keep console for debugging
     }
 });
 
@@ -697,22 +725,21 @@ btnReplay.addEventListener('click', () => {
                     currentFileIndexInFolder--;
                     const prevFilePath = currentPlaylistFromFolder[currentFileIndexInFolder];
                     console.log("Playing previous video:", prevFilePath);
-                    playSpecificMediaFile(prevFilePath); // This will trigger updateNextPrevButtonStates via loadMediaAndSetupPlaylist
-                                                        // or directly if playSpecificMediaFile is modified to call it.
-                                                        // For now, assume playSpecificMediaFile implicitly handles it or it's called after.
-                    updateNextPrevButtonStates(); // Explicitly call after index change
+            playSpecificMediaFile(prevFilePath); 
+            updateNextPrevButtonStates(); 
                 } else {
-                    console.log("Already at the first video in the folder.");
-                     updateNextPrevButtonStates(); // Still update, as state might change if it was previously not disabled
-                    // Optional: Play current video from start if it's the first in playlist
+            showUIMessage(translate('infoFirstVideoInPlaylist'), 'info'); // Already using showUIMessage
+            console.log("Already at the first video in the folder."); // Keep console for debugging
+            updateNextPrevButtonStates(); 
                     if (mediaActivo) {
                          mediaActivo.currentTime = 0;
                          if (mediaActivo.paused) mediaActivo.play();
                     }
                 }
             } else {
-                console.log("No folder playlist available or current file index is invalid for previous video. Replaying current.");
-                 if (mediaActivo) { // Fallback to replay current if no playlist for previous
+        showUIMessage(translate('infoNoPlaylistForPrevious'), 'info'); // Already using showUIMessage
+        console.log("No folder playlist available or current file index is invalid for previous video. Replaying current."); // Keep console for debugging
+         if (mediaActivo) { 
                     mediaActivo.currentTime = 0;
                     if (mediaActivo.paused) mediaActivo.play();
                 }
@@ -724,25 +751,27 @@ btnReplay.addEventListener('click', () => {
 
 // Next Video Button Functionality
 btnNextVideo.addEventListener('click', () => {
+    // Original console.log for this button was for placeholder functionality, now it's for actual navigation or info.
     if (currentPlaylistFromFolder && currentPlaylistFromFolder.length > 0 && currentFileIndexInFolder !== -1) {
         if (currentFileIndexInFolder < currentPlaylistFromFolder.length - 1) {
             currentFileIndexInFolder++;
             const nextFilePath = currentPlaylistFromFolder[currentFileIndexInFolder];
-            console.log("Playing next video:", nextFilePath);
-            playSpecificMediaFile(nextFilePath); // This will trigger updateNextPrevButtonStates via loadMediaAndSetupPlaylist
-                                                // or directly if playSpecificMediaFile is modified to call it.
-            updateNextPrevButtonStates(); // Explicitly call after index change
+            console.log("Playing next video:", nextFilePath); // Keep for debugging
+            playSpecificMediaFile(nextFilePath); 
+            updateNextPrevButtonStates(); 
         } else {
-            console.log("Already at the last video in the folder.");
-            updateNextPrevButtonStates(); // Still update, as state might change if it was previously not disabled
+            showUIMessage(translate('infoLastVideoInPlaylist'), 'info'); // Already using showUIMessage
+            console.log("Already at the last video in the folder."); // Keep for debugging
+            updateNextPrevButtonStates(); 
             // Optional: Implement looping to the first video if desired by user.
-            // if (bucle && currentPlaylistFromFolder.length > 0) {
+            // if (bucle && currentPlaylistFromFolder.length > 0) { // Check against 'bucle' for loop playlist
             //     currentFileIndexInFolder = 0;
             //     playSpecificMediaFile(currentPlaylistFromFolder[currentFileIndexInFolder]);
             // }
         }
     } else {
-        console.log("No folder playlist available or current file index is invalid.");
+        showUIMessage(translate('infoNoPlaylistAvailable'), 'info'); // Already using showUIMessage
+        console.log("No folder playlist available or current file index is invalid."); // Keep for debugging
     }
 });
 
@@ -752,6 +781,35 @@ initializeIcons();
 
 // video.addEventListener('ended', onEnded); // Now added in setupMediaEventListeners
 // audio.addEventListener('ended', onEnded); // Now added in setupMediaEventListeners
+
+// --- UI Message Function ---
+function showUIMessage(message, type = 'info', duration = 3000) {
+    if (!notificationArea) {
+        console.warn('Notification area not found in DOM.');
+        return;
+    }
+
+    notificationArea.textContent = message;
+    // Reset classes to base and type-specific, then add 'show'
+    notificationArea.className = 'notification-area'; // Reset
+    notificationArea.classList.add(type); // 'info', 'error', or 'success'
+    
+    // Trigger reflow to ensure transition plays on new 'show'
+    void notificationArea.offsetWidth; 
+
+    notificationArea.classList.add('show');
+
+    // Clear any existing timeout to prevent premature hiding
+    if (notificationTimeout) {
+        clearTimeout(notificationTimeout);
+    }
+
+    // Set a timeout to remove the 'show' class, triggering the fade-out
+    notificationTimeout = setTimeout(() => {
+        notificationArea.classList.remove('show');
+        // The CSS transition will handle display:none after opacity fades out
+    }, duration);
+}
 
 // Keyboard Shortcuts
 document.addEventListener('keydown', (event) => {

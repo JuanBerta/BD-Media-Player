@@ -245,3 +245,40 @@ html,
             /* .controles #btnReplay.has-previous { */
                 /* For example, a slightly different border or subtle background hint if desired */
             /* } */
+
+            .notification-area {
+                position: fixed;
+                bottom: 70px; /* Adjust if overlapping controls, consider control bar height */
+                left: 50%;
+                transform: translateX(-50%);
+                padding: 10px 20px;
+                border-radius: 5px;
+                z-index: 2000; /* Ensure it's above other elements */
+                opacity: 0; /* Initially hidden */
+                display: none; /* Initially hidden, will be controlled by JS */
+                transition: opacity 0.5s ease-in-out, display 0s linear 0.5s; /* Delay display none until opacity transition ends */
+                text-align: center;
+                max-width: 80%;
+                font-size: 0.9em; /* Kept from previous merge */
+            }
+
+            .notification-area.show {
+                display: block; /* Or flex, inline-block, etc., depending on desired layout */
+                opacity: 1;
+                transition: opacity 0.5s ease-in-out; /* Only opacity for showing */
+            }
+
+            .notification-area.error {
+                background-color: rgba(220, 53, 69, 0.9); /* Bootstrap danger red, slightly transparent */
+                color: white;
+            }
+
+            .notification-area.info {
+                background-color: rgba(13, 110, 253, 0.9); /* Bootstrap info blue, slightly transparent */
+                color: white;
+            }
+            
+            .notification-area.success {
+               background-color: rgba(25, 135, 84, 0.9); /* Bootstrap success green */
+               color: white;
+            }
