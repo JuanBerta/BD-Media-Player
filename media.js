@@ -14,8 +14,12 @@ const btnSettings = document.getElementById('btnSettings');
 const settingsMenu = document.getElementById('settingsMenu');
 const playbackSpeedOptionsContainer = document.getElementById('playbackSpeedOptions');
 const btnMiniplayer = document.getElementById('btnMiniplayer');
+const btnReplay = document.getElementById('btnReplay');
+const btnNextVideo = document.getElementById('btnNextVideo'); // Added Next Video Button
 
 // SVG Icons - Refined to be more YouTube-like (ViewBox 24 24 for consistency)
+const nextVideoIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"></path></svg>';
+const replayIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 5V1L7 6l5 5V7c3.31 0 6 2.69 6 6s-2.69 6-6 6-6-2.69-6-6H4c0 4.42 3.58 8 8 8s8-3.58 8-8-3.58-8-8-8z"></path></svg>';
 const playIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"></path></svg>';
 const pauseIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>';
 const volumeHighIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>';
@@ -488,7 +492,32 @@ function initializeIcons() {
     // Set icon and tooltip for file select
     btnSeleccionarArchivos.innerHTML = openFileIconSVG;
     btnSeleccionarArchivos.title = translate('openFileTooltip');
+
+    // Set icon and tooltip for replay button
+    btnReplay.innerHTML = replayIconSVG;
+    btnReplay.title = translate('replayTooltip');
+
+    // Set icon and tooltip for next video button
+    btnNextVideo.innerHTML = nextVideoIconSVG;
+    btnNextVideo.title = translate('nextVideoTooltip'); // Assuming 'nextVideoTooltip' maps to "Next (n)"
 }
+
+// Replay Button Functionality
+btnReplay.addEventListener('click', () => {
+    if (mediaActivo) {
+        mediaActivo.currentTime = 0;
+        if (mediaActivo.paused) { 
+            mediaActivo.play();
+        }
+    }
+});
+
+// Next Video Button Placeholder Functionality
+btnNextVideo.addEventListener('click', () => {
+    console.log("Next video button clicked - functionality pending user feedback on playlist/directory logic.");
+    alert("Next video functionality is not yet implemented. How should the 'next video' be determined?");
+    // Future implementation will depend on how the user wants to define "next".
+});
 
 // Call initialization
 initializeIcons();
@@ -496,3 +525,85 @@ initializeIcons();
 
 // video.addEventListener('ended', onEnded); // Now added in setupMediaEventListeners
 // audio.addEventListener('ended', onEnded); // Now added in setupMediaEventListeners
+
+// Keyboard Shortcuts
+document.addEventListener('keydown', (event) => {
+    // Prevent shortcuts if typing in an input, select, or textarea (future-proofing)
+    if (event.target.tagName === 'INPUT' || event.target.tagName === 'SELECT' || event.target.tagName === 'TEXTAREA') {
+        // Allow specific keys if needed, e.g., Escape for inputs
+        if (event.key === 'Escape') {
+            // Potentially blur the focused element or other specific escape actions
+        }
+        return;
+    }
+
+    // Prevent default for spacebar if it's not a settings menu option or similar context
+    if (event.key === ' ' && settingsMenu.style.display === 'none') {
+        event.preventDefault();
+    }
+
+    switch (event.key.toLowerCase()) { // Use toLowerCase for case-insensitivity for letter keys
+        case 'k':
+        case ' ': // Spacebar
+            btnReproducir.click();
+            break;
+        case 'm':
+            btnSilencio.click();
+            break;
+        case 'l':
+            btnLoop.click();
+            break;
+        case 's':
+            btnSettings.click();
+            break;
+        case 'i':
+            btnMiniplayer.click();
+            break;
+        case 'f':
+            btnPantallaCompleta.click();
+            break;
+        case 'o':
+            btnSeleccionarArchivos.click();
+            break;
+        case 'r':
+            if (btnReplay) btnReplay.click(); // btnReplay might not exist if code is old
+            break;
+        case 'arrowright':
+            if (mediaActivo) mediaActivo.currentTime += 5;
+            break;
+        case 'arrowleft':
+            if (mediaActivo) mediaActivo.currentTime -= 5;
+            break;
+        case 'arrowup':
+            if (mediaActivo) {
+                let newVolume = Math.min(1, mediaActivo.volume + 0.1);
+                mediaActivo.volume = newVolume;
+                controlVolumen.value = newVolume;
+                if (mediaActivo.muted && newVolume > 0) {
+                    // toggleMute(); // Or btnSilencio.click();
+                    // Direct state change to avoid repeated toggleMute logic if called rapidly
+                    mediaActivo.muted = false;
+                    btnSilencio.classList.remove('activo');
+                    btnSilencio.innerHTML = volumeHighIconSVG;
+                    btnSilencio.title = translate('mute') + ' (m)';
+                }
+            }
+            break;
+        case 'arrowdown':
+            if (mediaActivo) {
+                let newVolume = Math.max(0, mediaActivo.volume - 0.1);
+                mediaActivo.volume = newVolume;
+                controlVolumen.value = newVolume;
+                if (newVolume === 0 && !mediaActivo.muted) {
+                    // toggleMute(); // Or btnSilencio.click();
+                    mediaActivo.muted = true;
+                    volumenAnterior = 0; // Store 0 as previous volume when muted at 0
+                    btnSilencio.classList.add('activo');
+                    btnSilencio.innerHTML = volumeMutedIconSVG;
+                    btnSilencio.title = translate('unmute') + ' (m)';
+                }
+            }
+            break;
+        // No default needed, allow other keys to function normally
+    }
+});
