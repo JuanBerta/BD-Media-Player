@@ -29,7 +29,12 @@ const btnCloseYouTubeSearch = document.getElementById('btnCloseYouTubeSearch'); 
 const youtubeSearchInput = document.getElementById('youtubeSearchInput'); // Corrected ID
 const youtubeSearchButton = document.getElementById('youtubeSearchButton'); // Corrected ID
 const youtubeSearchResults = document.getElementById('youtubeSearchResults'); // Corrected ID
-// const youtubePlayerFrame = document.getElementById('youtubePlayerFrame'); // For later use
+
+// API Key UI Elements
+const youtubeApiKeyInput = document.getElementById('youtubeApiKeyInput');
+const saveYouTubeApiKeyButton = document.getElementById('saveYouTubeApiKeyButton');
+const apiKeyStatusMessage = document.getElementById('apiKeyStatusMessage');
+
 
 let notificationTimeout = null; // To manage the timeout for hiding the message
 
@@ -625,7 +630,13 @@ btnMiniplayer.addEventListener('click', async () => {
 // Settings Menu Toggle
 btnSettings.addEventListener('click', (event) => {
     event.stopPropagation(); // Prevents click from immediately closing menu
-    settingsMenu.style.display = settingsMenu.style.display === 'none' ? 'block' : 'none';
+    const isHidden = settingsMenu.style.display === 'none' || settingsMenu.style.display === '';
+    if (isHidden) {
+        loadApiKeyOnStart(); // Load API key status when menu is opened
+        settingsMenu.style.display = 'block';
+    } else {
+        settingsMenu.style.display = 'none';
+    }
 });
 
 document.addEventListener('click', (event) => {
@@ -791,7 +802,10 @@ btnNextVideo.addEventListener('click', () => {
 });
 
 // Call initialization
-initializeIcons();
+initializeIcons(); // This should be called to ensure all icons are set up
+// loadApiKeyOnStart(); // Optionally call on initial script load if preferred,
+                     // but calling on settings open is also fine and ensures fresh status.
+
 // The languageChanged listener was already updated in the previous step.
 
 // video.addEventListener('ended', onEnded); // Now added in setupMediaEventListeners
@@ -939,6 +953,68 @@ if (youtubeSearchInput) {
         if (event.key === 'Enter') {
             event.preventDefault(); 
             performYouTubeSearch();
+        }
+    });
+}
+} // This curly brace was missing, assuming it closes the if (youtubeSearchButton) block
+
+// --- API Key Management ---
+async function loadApiKeyOnStart() {
+    if (!youtubeApiKeyInput || !apiKeyStatusMessage) return; // Ensure elements exist
+
+    try {
+        const result = await window.electronAPI.invoke('load-api-key');
+        if (result.error) {
+            showUIMessage(`Error loading API key: ${result.error}`, 'error');
+            apiKeyStatusMessage.textContent = 'Error loading key.'; // No translate() here yet
+            apiKeyStatusMessage.style.color = 'orange'; // Or use CSS classes
+        } else if (result.apiKey) {
+            youtubeApiKeyInput.placeholder = 'API Key is set (********)'; // Don't show the key
+            apiKeyStatusMessage.textContent = 'API Key is configured.'; // No translate() here yet
+            apiKeyStatusMessage.style.color = 'lightgreen';
+            console.log('API Key is configured.');
+        } else {
+            youtubeApiKeyInput.placeholder = 'Enter your API Key'; // No translate() here yet
+            apiKeyStatusMessage.textContent = 'API Key not set. Please configure it for YouTube search.'; // No translate() here yet
+            apiKeyStatusMessage.style.color = 'orange';
+            console.log('API Key not set.');
+        }
+    } catch (error) {
+        showUIMessage(`Failed to check API key status: ${error.message}`, 'error');
+        if(apiKeyStatusMessage) {
+            apiKeyStatusMessage.textContent = 'Could not retrieve key status.'; // No translate() here yet
+            apiKeyStatusMessage.style.color = 'red';
+        }
+    }
+}
+
+if (saveYouTubeApiKeyButton && youtubeApiKeyInput && apiKeyStatusMessage) {
+    saveYouTubeApiKeyButton.addEventListener('click', async () => {
+        const newApiKey = youtubeApiKeyInput.value;
+        if (!newApiKey.trim()) {
+            showUIMessage('API Key cannot be empty.', 'info'); // No translate() here yet
+            return;
+        }
+        try {
+            const result = await window.electronAPI.invoke('save-api-key', newApiKey);
+            if (result.success) {
+                showUIMessage('API Key saved successfully!', 'success'); // No translate() here yet
+                youtubeApiKeyInput.value = ''; // Clear input
+                youtubeApiKeyInput.placeholder = 'API Key is set (********)';
+                if(apiKeyStatusMessage) {
+                     apiKeyStatusMessage.textContent = 'API Key configured.'; // No translate() here yet
+                     apiKeyStatusMessage.style.color = 'lightgreen';
+                }
+            } else {
+                showUIMessage(`Failed to save API Key: ${result.error || 'Unknown error'}`, 'error'); // No translate() here yet
+                if(apiKeyStatusMessage) apiKeyStatusMessage.textContent = `Error saving key: ${result.error || 'Unknown error'}`;
+            }
+        } catch (error) {
+            showUIMessage(`Error saving API Key: ${error.message}`, 'error'); // No translate() here yet
+             if(apiKeyStatusMessage) {
+                apiKeyStatusMessage.textContent = `Error: ${error.message}`; // No translate() here yet
+                apiKeyStatusMessage.style.color = 'red';
+             }
         }
     });
 }

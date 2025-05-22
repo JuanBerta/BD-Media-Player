@@ -2,20 +2,24 @@ const { app, BrowserWindow, ipcMain } = require('electron');
 const fs = require('fs');
 const nodePath = require('path'); // Renamed to avoid conflict
 const https = require('https'); // Added for YouTube API calls
+const Store = require('electron-store');
 
-let YOUTUBE_API_KEY = null;
-try {
-    YOUTUBE_API_KEY = require('./youtube_api_key.js');
-    if (!YOUTUBE_API_KEY || typeof YOUTUBE_API_KEY !== 'string' || YOUTUBE_API_KEY === 'YOUR_ACTUAL_API_KEY') {
-        console.warn('YouTube API Key is missing or invalid in youtube_api_key.js. Please create this file and add your key.');
-        YOUTUBE_API_KEY = null; // Ensure it's null if invalid
-    } else {
-        console.log('YouTube API Key loaded successfully.');
-    }
-} catch (error) {
-    console.warn('youtube_api_key.js file not found or error requiring it. YouTube search functionality will be disabled.');
-    YOUTUBE_API_KEY = null;
-}
+const store = new Store();
+
+// Remove the old YOUTUBE_API_KEY loading from youtube_api_key.js
+// let YOUTUBE_API_KEY = null;
+// try {
+//     YOUTUBE_API_KEY = require('./youtube_api_key.js');
+//     if (!YOUTUBE_API_KEY || typeof YOUTUBE_API_KEY !== 'string' || YOUTUBE_API_KEY === 'YOUR_ACTUAL_API_KEY') {
+//         console.warn('YouTube API Key is missing or invalid in youtube_api_key.js. Please create this file and add your key.');
+//         YOUTUBE_API_KEY = null; // Ensure it's null if invalid
+//     } else {
+//         console.log('YouTube API Key loaded successfully.');
+//     }
+// } catch (error) {
+//     console.warn('youtube_api_key.js file not found or error requiring it. YouTube search functionality will be disabled.');
+//     YOUTUBE_API_KEY = null;
+// }
 
 function createWindow() {
     const mainWindow = new BrowserWindow({
@@ -73,8 +77,11 @@ app.whenReady().then(() => {
     });
 
     ipcMain.handle('youtube-search', async (event, searchQuery) => {
-        if (!YOUTUBE_API_KEY) {
-            return { error: 'YouTube API Key is not configured on the server.' };
+        const API_KEY = store.get('youtubeApiKey'); // Use this
+
+        if (!API_KEY) { // Check if key exists from store
+            console.warn('YouTube API Key has not been set. Please set it in the settings menu.');
+            return { error: 'YouTube API Key not configured. Please set it via the settings menu.' };
         }
         if (!searchQuery || typeof searchQuery !== 'string' || searchQuery.trim() === '') {
             return { error: 'Invalid search query provided.' };
@@ -82,7 +89,7 @@ app.whenReady().then(() => {
 
         const maxResults = 10; // Or make configurable
         const searchType = 'video,playlist'; // Search for both videos and playlists
-        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchQuery)}&key=${YOUTUBE_API_KEY}&maxResults=${maxResults}&type=${searchType}`;
+        const url = `https://www.googleapis.com/youtube/v3/search?part=snippet&q=${encodeURIComponent(searchQuery)}&key=${API_KEY}&maxResults=${maxResults}&type=${searchType}`;
 
         return new Promise((resolve, reject) => {
             https.get(url, (res) => {
@@ -118,6 +125,35 @@ app.whenReady().then(() => {
                 resolve({ error: 'Failed to make YouTube API request: ' + err.message });
             });
         });
+    });
+
+    ipcMain.handle('save-api-key', async (event, apiKey) => {
+        try {
+            if (typeof apiKey === 'string') {
+                store.set('youtubeApiKey', apiKey);
+                console.log('YouTube API Key saved.');
+                return { success: true };
+            } else {
+                return { success: false, error: 'Invalid API key format.' };
+            }
+        } catch (error) {
+            console.error('Failed to save API key:', error);
+            return { success: false, error: error.message };
+        }
+    });
+
+    ipcMain.handle('load-api-key', async () => {
+        try {
+            const apiKey = store.get('youtubeApiKey');
+            if (apiKey) {
+                console.log('YouTube API Key loaded.');
+                return { apiKey: apiKey };
+            }
+            return { apiKey: null }; // No key found
+        } catch (error) {
+            console.error('Failed to load API key:', error);
+            return { error: error.message };
+        }
     });
 
     app.on('activate', function () {
