@@ -7,8 +7,10 @@ function createWindow() {
         width: 800,
         height: 600,
         webPreferences: {
-            nodeIntegration: true, // Habilita Node.js en el proceso de renderizado (con precaución)
-            contextIsolation: false, // Deshabilita el aislamiento de contexto (menos seguro)
+            nodeIntegration: false,    // More secure
+            contextIsolation: true,    // More secure, enables contextBridge
+            preload: nodePath.join(__dirname, 'preload.js') // Path to the preload script
+            // enableRemoteModule: true // Removed as per instructions
         },
     });
 
