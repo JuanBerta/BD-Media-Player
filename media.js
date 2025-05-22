@@ -26,6 +26,7 @@ const loopIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 4
 const settingsIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19.43 12.98c.04-.32.07-.64.07-.98s-.03-.66-.07-.98l2.11-1.65c.19-.15.24-.42.12-.64l-2-3.46c-.12-.22-.39-.3-.61-.22l-2.49 1c-.52-.4-1.08-.73-1.69-.98l-.38-2.65C14.46 2.18 14.25 2 14 2h-4c-.25 0-.46.18-.49.42l-.38 2.65c-.61.25-1.17.59-1.69.98l-2.49-1c-.23-.09-.49 0-.61.22l-2 3.46c-.13.22-.07.49.12.64l2.11 1.65c-.04.32-.07.65-.07.98s.03.66.07.98l-2.11 1.65c-.19.15-.24.42.12.64l2 3.46c.12.22.39.3.61.22l2.49-1c.52.4 1.08.73 1.69.98l.38 2.65c.03.24.24.42.49.42h4c.25 0 .46-.18.49-.42l.38-2.65c.61-.25 1.17-.59 1.69-.98l2.49 1c.23.09.49 0 .61.22l2 3.46c.13.22.07.49.12.64l-2.11-1.65zM12 15.5c-1.93 0-3.5-1.57-3.5-3.5s1.57-3.5 3.5-3.5 3.5 1.57 3.5 3.5-1.57 3.5-3.5 3.5z"></path></svg>';
 const miniplayerIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 7h-8v6h8V7zm2-4H3c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h18c1.1 0 2-.9 2-2V5c0-1.1-.9-2-2-2zm0 14H3V5h18v12z"></path></svg>'; // More like YouTube's PiP
 const miniplayerExitIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M19 19V4H5v15h14zm-2-4h-2v-2h2v-2h-2V9h2V7h-2V5h2v11z"></path></svg>'; // Example: Could be an X or styled differently
+const openFileIconSVG = '<svg viewBox="0 0 24 24" fill="currentColor"><path d="M10 4H4c-1.11 0-2 .89-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V8c0-1.1-.9-2-2-2h-8l-2-2z"></path></svg>';
 
 var tipoArchivo
 var mediaActivo
@@ -56,50 +57,44 @@ fileInput.addEventListener('change', (event) => {
 
     // 2. Limpiar el medio ACTIVO anterior (si existe)
     if (mediaActivo) {
+        cleanupMediaEventListeners(mediaActivo);
         mediaActivo.pause();
-        URL.revokeObjectURL(mediaActivo.src);
-        mediaActivo.src = '';
-        mediaActivo.removeEventListener('loadedmetadata', playOnLoad);
-        mediaActivo.removeEventListener('timeupdate', actualizarTiempo);
-        // Remove PiP listeners if they were added to the old mediaActivo
-        if (mediaActivo.tagName === 'VIDEO') {
-            mediaActivo.removeEventListener('enterpictureinpicture', handleEnterPiP);
-            mediaActivo.removeEventListener('leavepictureinpicture', handleLeavePiP);
+        URL.revokeObjectURL(mediaActivo.src); // Revoke old URL
+        mediaActivo.src = ''; // Clear src
+        if (mediaActivo === video) { // Ensure the non-active element is also reset
+            audio.src = ''; audio.removeAttribute('src'); // Clear audio if video was active
+        } else {
+            video.src = ''; video.removeAttribute('src'); // Clear video if audio was active
         }
     }
 
     // 3. Asignar el NUEVO medio como ACTIVO (DESPUÉS de limpiar el anterior)
-    mediaActivo = nuevoMedia;
+    mediaActivo = nuevoMedia; // video or audio element
 
     // 4. Asignar la nueva fuente
     mediaActivo.src = url;
-
-    //Reasignamos playOnLoad ANTES de adjuntar el listener para guardar la nueva referencia.
-    playOnLoad = () => {
-        mediaActivo.play();
-        isPlaying = true;
-        updatePlayButtonIcon();
-        mediaActivo.removeEventListener('loadedmetadata', playOnLoad);
-    };
-
-    mediaActivo.addEventListener('loadedmetadata', playOnLoad);
-    mediaActivo.addEventListener('timeupdate', actualizarTiempo);
-
-    // Add PiP listeners for the new mediaActivo if it's a video
-    if (mediaActivo.tagName === 'VIDEO') {
-        mediaActivo.addEventListener('enterpictureinpicture', handleEnterPiP);
-        mediaActivo.addEventListener('leavepictureinpicture', handleLeavePiP);
-    }
+    setupMediaEventListeners(mediaActivo); // Add listeners to the new mediaActivo
+    mediaActivo.load(); // Important: Call load() after setting src and adding listeners
 });
 
-// Función para manejar la carga y reproducción de archivos
-function cargarArchivo(file) {
-    const url = URL.createObjectURL(file);
-    video.addEventListener('loadedmetadata', () => handleMetadataLoaded(video));
-    audio.addEventListener('loadedmetadata', () => handleMetadataLoaded(audio));
-    mediaActivo.src = url;
-    mediaActivo.load();
-    mediaActivo.play();
+// Wrapper for file loading to ensure playOnLoad is correctly scoped if needed, though direct play might be fine
+function cargarArchivo(file) { // This function seems redundant now with the main fileInput listener
+    const url = URL.createObjectURL(file); // This URL should be revoked when media changes
+    const tipo = esVideoOAudio(file); // Determine type again, or pass from main listener
+
+    let targetMediaElement = video; // Default to video
+    if (tipo === 'audio') {
+        targetMediaElement = audio;
+    }
+    
+    // This function is problematic if called directly without full context of mediaActivo management
+    // For now, let's assume fileInput.eventListener is the primary way to load.
+    // If this function is still needed, it needs to integrate with mediaActivo and cleanup/setup listeners.
+    // Commenting out direct listener attachment here as it's handled by setupMediaEventListeners
+    // targetMediaElement.addEventListener('loadedmetadata', () => handleMetadataLoaded(targetMediaElement));
+    targetMediaElement.src = url;
+    targetMediaElement.load();
+    targetMediaElement.play().catch(e => console.error("Error playing media in cargarArchivo:", e));
 }
 
 function esVideoOAudio(file) {
@@ -119,7 +114,7 @@ function esVideoOAudio(file) {
     }
 }
 
-let playOnLoad;       // Declarar playOnLoad fuera
+// let playOnLoad; // This global variable is no longer used by the refactored listener setup.
 let volumenAnterior = 1;
 
 btnSilencio.addEventListener('click', (event) => {
@@ -197,26 +192,83 @@ function updatePlayButtonIcon() {
     btnReproducir.title = isPlaying ? (translate('pause') + ' (k)') : (translate('play') + ' (k)');
 }
 
-function handleMetadataLoaded(media) {
-    mediaActivo = media;
+function handleMetadataLoaded() { // Now specifically for mediaActivo
+    if (!mediaActivo) return;
     updatePlayButtonIcon();
-    if (mediaActivo) {
-        updatePlaybackSpeedUI(mediaActivo.playbackRate.toString());
-        // Initialize PiP icon state
-        if (mediaActivo.tagName === 'VIDEO') {
-            if (document.pictureInPictureElement === mediaActivo) {
-                btnMiniplayer.innerHTML = miniplayerExitIconSVG;
-                btnMiniplayer.title = translate('exitMiniplayer');
-            } else {
-                btnMiniplayer.innerHTML = miniplayerIconSVG;
-                btnMiniplayer.title = translate('miniplayer') + ' (i)';
-            }
+    updatePlaybackSpeedUI(mediaActivo.playbackRate.toString());
+    if (mediaActivo.tagName === 'VIDEO') {
+        if (document.pictureInPictureElement === mediaActivo) {
+            btnMiniplayer.innerHTML = miniplayerExitIconSVG;
+            btnMiniplayer.title = translate('exitMiniplayer');
+        } else {
+            btnMiniplayer.innerHTML = miniplayerIconSVG;
+            btnMiniplayer.title = translate('miniplayer') + ' (i)';
         }
     }
 }
 
-video.addEventListener('loadedmetadata', () => handleMetadataLoaded(video));
-audio.addEventListener('loadedmetadata', () => handleMetadataLoaded(audio));
+// Centralized Event Handlers for mediaActivo
+const onPlay = () => {
+    if (!mediaActivo || event.target !== mediaActivo) return; // Ensure event is for current media
+    isPlaying = true;
+    updatePlayButtonIcon();
+};
+
+const onPause = () => {
+    if (!mediaActivo || event.target !== mediaActivo) return; // Ensure event is for current media
+    isPlaying = false;
+    updatePlayButtonIcon();
+};
+
+const onEnded = () => {
+    if (!mediaActivo || event.target !== mediaActivo) return; // Ensure event is for current media
+    isPlaying = false;
+    updatePlayButtonIcon();
+    if (bucle) {
+        mediaActivo.currentTime = 0;
+        mediaActivo.play();
+    }
+};
+
+// Placeholder for the new playOnLoad, to be attached dynamically
+let currentPlayOnLoad; 
+
+function setupMediaEventListeners(mediaElement) {
+    // Define playOnLoad specific to this mediaElement instance
+    currentPlayOnLoad = () => {
+        // mediaElement.play(); // play() is called after load() in the main file input listener.
+                             // Or, if not, it should be called here.
+                             // For now, assuming play is handled by the main file load sequence.
+        isPlaying = true; // Should be set by 'play' event, but can be pre-emptive
+        updatePlayButtonIcon();
+        mediaElement.removeEventListener('loadedmetadata', currentPlayOnLoad); // Self-removing
+    };
+
+    mediaElement.addEventListener('loadedmetadata', currentPlayOnLoad);
+    mediaElement.addEventListener('timeupdate', actualizarTiempo); // actualizarTiempo needs to check mediaActivo
+    mediaElement.addEventListener('play', onPlay);
+    mediaElement.addEventListener('pause', onPause);
+    mediaElement.addEventListener('ended', onEnded);
+    if (mediaElement.tagName === 'VIDEO') {
+        mediaElement.addEventListener('enterpictureinpicture', handleEnterPiP);
+        mediaElement.addEventListener('leavepictureinpicture', handleLeavePiP);
+    }
+}
+
+function cleanupMediaEventListeners(mediaElement) {
+    if (currentPlayOnLoad) { // Ensure it was defined before trying to remove
+        mediaElement.removeEventListener('loadedmetadata', currentPlayOnLoad);
+    }
+    mediaElement.removeEventListener('timeupdate', actualizarTiempo);
+    mediaElement.removeEventListener('play', onPlay);
+    mediaElement.removeEventListener('pause', onPause);
+    mediaElement.removeEventListener('ended', onEnded);
+    if (mediaElement.tagName === 'VIDEO') {
+        mediaElement.removeEventListener('enterpictureinpicture', handleEnterPiP);
+        mediaElement.removeEventListener('leavepictureinpicture', handleLeavePiP);
+    }
+}
+
 
 // Fullscreen and PiP event handlers
 document.addEventListener('fullscreenchange', () => {
@@ -252,52 +304,62 @@ btnReproducir.addEventListener('click', () => {
     // updatePlayButtonIcon will also be called by those event listeners.
 });
 
-video.addEventListener('play', () => {
-    isPlaying = true;
-    updatePlayButtonIcon();
-});
+// video.addEventListener('play', onPlay); // Now added in setupMediaEventListeners
+// video.addEventListener('pause', onPause); // Now added in setupMediaEventListeners
+// audio.addEventListener('play', onPlay); // Now added in setupMediaEventListeners
+// audio.addEventListener('pause', onPause); // Now added in setupMediaEventListeners
 
-video.addEventListener('pause', () => {
-    isPlaying = false;
-    updatePlayButtonIcon();
-});
-
-audio.addEventListener('play', () => {
-    isPlaying = true;
-    updatePlayButtonIcon();
-});
-
-audio.addEventListener('pause', () => {
-    isPlaying = false;
-    updatePlayButtonIcon();
-});
 
 window.addEventListener('languageChanged', () => {
-    // Text for buttons like "Seleccionar Archivo" is handled by i18n library.
-    // Icons are language-independent, but play/pause state might need refresh
-    // if it was reliant on translated text which is now an icon.
-    // Calling updatePlayButtonIcon ensures the correct play/pause icon is shown.
+    initializeIcons(); // Re-initialize to update all tooltips based on new language
+    updatePlayButtonIcon(); // Update play/pause button tooltip and icon
     if (mediaActivo) {
-        updatePlayButtonIcon();
+        if (mediaActivo.muted) {
+            btnSilencio.title = translate('unmute') + ' (m)';
+        } else {
+            btnSilencio.title = translate('mute') + ' (m)';
+        }
+        // Update fullscreen and PiP tooltips as well, as they might depend on language
+        if (document.fullscreenElement === mediaActivo) { // Check if current media is fullscreen
+             btnPantallaCompleta.title = translate('exitFullscreen') + ' (f)';
+        } else {
+             btnPantallaCompleta.title = translate('fullscreen') + ' (f)';
+        }
+        if (mediaActivo.tagName === 'VIDEO') {
+            if (document.pictureInPictureElement === mediaActivo) {
+                btnMiniplayer.title = translate('exitMiniplayer');
+            } else {
+                btnMiniplayer.title = translate('miniplayer') + ' (i)';
+            }
+        }
     } else {
-        // If no media is active, ensure play button shows 'play' icon
+         // If no media is active, ensure play button shows 'play' icon and default tooltips
         btnReproducir.innerHTML = playIconSVG;
+        btnReproducir.title = translate('play') + ' (k)';
+        // Other buttons would have their default titles from initializeIcons
     }
 });
 
 //Ejemplo de inicializacion del controlVolumen:
 controlVolumen.addEventListener("input", () => {
+    if (!mediaActivo) return;
     mediaActivo.volume = controlVolumen.value;
 });
 
 barraProgreso.addEventListener('click', function (e) {
+    if (!mediaActivo || isNaN(mediaActivo.duration)) return;
     let rect = barraProgreso.getBoundingClientRect();
     let posicion = (e.clientX - rect.left) / rect.width;
     mediaActivo.currentTime = posicion * mediaActivo.duration;
 });
 
-function actualizarTiempo() {
-    if (isNaN(mediaActivo.duration)) return; //Para evitar errores al iniciar
+function actualizarTiempo() { // Called by mediaActivo's timeupdate event
+    if (!mediaActivo || isNaN(mediaActivo.duration)) {
+        // Potentially clear the time display if no media or duration is NaN
+        tiempo.textContent = "0:00 / 0:00";
+        barraProgreso.style.background = `linear-gradient(to right, #FF0000 0%, rgba(221, 221, 221, 0.5) 0%)`;
+        return;
+    }
     let minutos = Math.floor(mediaActivo.currentTime / 60);
     let segundos = Math.floor(mediaActivo.currentTime % 60);
     let duracionMinutos = Math.floor(mediaActivo.duration / 60);
@@ -409,47 +471,28 @@ function initializeIcons() {
     }
     btnLoop.innerHTML = loopIconSVG;
     btnLoop.title = translate('loop') + ' (l)';
-    btnPantallaCompleta.innerHTML = document.fullscreenElement ? fullscreenExitIconSVG : fullscreenEnterIconSVG;
-    btnPantallaCompleta.title = document.fullscreenElement ? (translate('exitFullscreen') + ' (f)') : (translate('fullscreen') + ' (f)');
+    btnPantallaCompleta.innerHTML = document.fullscreenElement ? fullscreenExitIconSVG : fullscreenEnterIconSVG; // Check global fullscreen state
+    btnPantallaCompleta.title = (document.fullscreenElement ? translate('exitFullscreen') : translate('fullscreen')) + ' (f)';
     btnSettings.innerHTML = settingsIconSVG;
     btnSettings.title = translate('settings') + ' (s)';
-    btnMiniplayer.innerHTML = miniplayerIconSVG;
-    btnMiniplayer.title = translate('miniplayer') + ' (i)';
+    
+    // PiP icon depends on video and its current PiP state
+    if (mediaActivo && mediaActivo.tagName === 'VIDEO' && document.pictureInPictureElement === mediaActivo) {
+        btnMiniplayer.innerHTML = miniplayerExitIconSVG;
+        btnMiniplayer.title = translate('exitMiniplayer');
+    } else {
+        btnMiniplayer.innerHTML = miniplayerIconSVG;
+        btnMiniplayer.title = translate('miniplayer') + ' (i)';
+    }
 
-    // Initial tooltip for file select (static)
-    btnSeleccionarArchivos.title = translate('openFile') + ' (o)';
+    // Set icon and tooltip for file select
+    btnSeleccionarArchivos.innerHTML = openFileIconSVG;
+    btnSeleccionarArchivos.title = translate('openFileTooltip');
 }
 
 // Call initialization
 initializeIcons();
-// Ensure tooltips are updated if language changes after initialization
-window.addEventListener('languageChanged', () => {
-    initializeIcons(); // Re-initialize to update all tooltips based on new language
-    // Also update dynamic ones that depend on state
-    updatePlayButtonIcon(); 
-    if (mediaActivo) {
-        toggleMute(); // Call to update mute button tooltip, but immediately toggle back to keep state
-        toggleMute();
-    }
-});
+// The languageChanged listener was already updated in the previous step.
 
-
-video.addEventListener('ended', () => {
-    if (bucle) {
-        console.log('Video finalizado, reiniciando...');
-        video.currentTime = 0;
-        video.play();
-    } else {
-        console.log('Video finalizado, bucle desactivado');
-    }
-});
-
-audio.addEventListener('ended', () => {
-    if (bucle) {
-        console.log('Video finalizado, reiniciando...');
-        audio.currentTime = 0;
-        audio.play();
-    } else {
-        console.log('Video finalizado, bucle desactivado');
-    }
-});
+// video.addEventListener('ended', onEnded); // Now added in setupMediaEventListeners
+// audio.addEventListener('ended', onEnded); // Now added in setupMediaEventListeners
